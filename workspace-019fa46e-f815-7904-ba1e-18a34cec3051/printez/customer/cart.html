@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Your cart</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><meta name="theme-color" content="#c2410c"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c2410c'/%3E%3Ctext x='16' y='22' font-family='Inter' font-size='18' font-weight='800' text-anchor='middle' fill='white'%3Epz%3C/text%3E%3C/svg%3E"/>
+</head>
+<body>
+<div id="app"></div><div id="nav"></div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+let cart = Data.cart();
+let address = JSON.parse(localStorage.getItem('pz_addr_v1')||'{}');
+let pickup = false;
+const cust = Auth.customer();
+let name=address.name||cust?.name||'', phone=address.phone||cust?.phone||'', line=address.line||'';
+
+function totals(){
+  const subtotal = cart.reduce((s,i)=>s+i.lineTotal,0);
+  // group delivery fees by shop (one fee per shop in the order)
+  const shopFees = {};
+  cart.forEach(i=>{
+    const l = Data.listingById(i.productId,i.listingId);
+    const fee = (l && !pickup) ? l.deliveryFee : 0;
+    shopFees[i.shopId] = Math.max(shopFees[i.shopId]||0, fee);
+  });
+  const delivery = Object.values(shopFees).reduce((s,f)=>s+f,0);
+  const total = subtotal+delivery;
+  const freeShip = subtotal>=500;
+  return { subtotal, delivery:freeShip?0:delivery, total, freeShip };
+}
+
+function render(){
+  if(!Auth.customer()){
+    document.getElementById('app').innerHTML = `
+      ${renderTopbarCustomer()}<main class="container">
+      <div class="empty" style="padding-top:60px">
+        <div class="ic">🔐</div><h3>Please sign in</h3><p>Sign in with your phone to checkout.</p>
+        <a href="login.html?next=cart.html" class="btn btn-primary">Sign in</a>
+      </div></main>`;
+    document.getElementById('nav').innerHTML = renderBottomNavCustomer('cart');
+    bindCustomerShell(); return;
+  }
+  if(cart.length===0){
+    document.getElementById('app').innerHTML=`
+      ${renderTopbarCustomer()}<main class="container">
+      <div class="empty" style="padding-top:60px">
+        <div class="ic">🛒</div><h3>Your cart is empty</h3><p>Browse print & gifting products to get started.</p>
+        <a href="index.html" class="btn btn-primary">Browse catalog</a>
+      </div></main>`;
+    document.getElementById('nav').innerHTML=renderBottomNavCustomer('cart');
+    bindCustomerShell(); return;
+  }
+  const t = totals();
+  document.getElementById('app').innerHTML = `
+    ${renderTopbarCustomer()}
+    <main class="container-med" style="padding-bottom:0">
+      <h1 class="font-display" style="font-size:24px;font-weight:800;margin:16px 0 12px">Your cart</h1>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${cart.map((it,idx)=>{
+          const p = Data.productById(it.productId);
+          return `<div class="card card-pad" style="display:flex;gap:12px">
+            <div style="width:70px;height:70px;border-radius:12px;overflow:hidden;background:var(--ink-50);flex-shrink:0">${productArt(p,140)}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700">${p.name}</div>
+              <div class="text-xs muted" style="margin-top:2px">${Object.values(it.specs).filter(v=>v).join(' · ')}</div>
+              <div class="text-xs muted">Sold by <b>${it.shopName}</b></div>
+              <div class="flex-between" style="margin-top:8px;flex-wrap:wrap;gap:8px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <button data-qty-idx="${idx}" data-qty-delta="-1" class="btn btn-outline qty-btn" style="width:30px;height:30px;padding:0;border-radius:8px">−</button>
+                  <span style="min-width:28px;text-align:center;font-weight:700;font-size:14px">${it.quantity}</span>
+                  <button data-qty-idx="${idx}" data-qty-delta="1" class="btn btn-outline qty-btn" style="width:30px;height:30px;padding:0;border-radius:8px">+</button>
+                  <button data-remove="${idx}" style="margin-left:6px;padding:4px 10px;border-radius:8px;font-size:12px;color:var(--bad);font-weight:600" class="rm">Remove</button>
+                </div>
+                <div class="font-display font-extrabold" style="font-size:17px">${inr(it.lineTotal)}</div>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="card card-pad mt-16">
+        <div class="text-xs font-bold uppercase muted" style="letter-spacing:.06em;margin-bottom:10px">Delivery details</div>
+        <input id="f-name" class="input" placeholder="Your name" value="${name}"/>
+        <input id="f-phone" class="input mt-8" style="margin-top:8px" placeholder="10-digit phone" value="${phone}" inputmode="numeric"/>
+        <textarea id="f-addr" class="textarea mt-8" style="margin-top:8px" rows="2" placeholder="Flat / Shop, Society, Sector, Landmark — Kharghar / Navi Mumbai">${line}</textarea>
+        <label class="flex flex-gap" style="gap:8px;margin-top:10px;align-items:center;font-size:14px">
+          <input type="checkbox" id="f-pickup" ${pickup?'checked':''} style="accent-color:var(--brand-600)"/>
+          I'll pick up from the shop (no delivery fee)
+        </label>
+      </div>
+
+      <div class="card card-pad mt-16" style="margin-bottom:8px">
+        <div class="flex-between" style="padding:4px 0"><span class="muted">Subtotal</span><span class="font-bold">${inr(t.subtotal)}</span></div>
+        <div class="flex-between" style="padding:4px 0"><span class="muted">Delivery${t.freeShip?' (FREE over ₹500)':''}</span><span class="font-bold">${t.delivery?inr(t.delivery):'FREE'}</span></div>
+        <div class="divider"></div>
+        <div class="flex-between" style="align-items:baseline"><span class="font-bold">Total</span><span class="price-lg">${inr(t.total)}</span></div>
+        <div class="text-xs muted" style="margin-top:4px">Includes 15-25% platform fee paid by the shop. You pay only the listed price.</div>
+      </div>
+
+      <div class="pd-spacer"></div>
+      <div class="pd-sticky">
+        <div>
+          <div class="text-xs" style="color:#a8a29e">${t.freeShip?'🎉 Free delivery':'Total'}</div>
+          <div class="font-display font-extrabold" style="font-size:22px;line-height:1.1">${inr(t.total)}</div>
+        </div>
+        <button id="pay" class="btn btn-primary btn-lg" style="flex-shrink:0">Place order ⚡</button>
+      </div>
+    </main>`;
+  document.getElementById('nav').innerHTML=renderBottomNavCustomer('cart');
+  bindCustomerShell();
+  bind();
+}
+
+function bind(){
+  document.querySelectorAll('.rm').forEach(b=>b.addEventListener('click',()=>{
+    cart.splice(parseInt(b.dataset.remove),1); Data.saveCart(cart); render();
+  }));
+  document.querySelectorAll('.qty-btn').forEach(b=>b.addEventListener('click',()=>{
+    const i = parseInt(b.dataset.qtyIdx);
+    const d = parseInt(b.dataset.qtyDelta);
+    const it = cart[i]; if(!it) return;
+    it.quantity = Math.max(1, it.quantity + d);
+    it.lineTotal = it.unitPrice * it.quantity;
+    Data.saveCart(cart); render();
+  }));
+  const n=document.getElementById('f-name'), p=document.getElementById('f-phone'), a=document.getElementById('f-addr'), pu=document.getElementById('f-pickup');
+  if(n){
+    n.addEventListener('input',()=>{name=n.value});
+    p.addEventListener('input',()=>{phone=p.value.replace(/\D/g,'').slice(0,10); p.value=phone});
+    a.addEventListener('input',()=>{line=a.value});
+    pu.addEventListener('change',()=>{pickup=pu.checked; render();});
+  }
+  const pay = document.getElementById('pay');
+  if(pay) pay.addEventListener('click',()=>{
+    if(!name.trim()||phone.length!==10){ toast('Fill in name and a valid phone','error'); return; }
+    if(!pickup && line.trim().length<8){ toast('Enter a complete delivery address or choose pickup','error'); return; }
+    localStorage.setItem('pz_addr_v1', JSON.stringify({name,phone,line}));
+
+    // Create orders (group items by shop for production realism, but keep one-order-per-line simplicity)
+    const orders = Data.orders();
+    const created = [];
+    cart.forEach(it=>{
+      const p = Data.productById(it.productId);
+      const total = it.lineTotal;
+      const comm = Math.round(total*COMMISSION[p.category]);
+      const o = {
+        id:'ORD-'+(1200+orders.length+created.length+1),
+        customerName:name, customerPhone:phone, customerId:Auth.customer()?.id||null,
+        productId:it.productId, listingId:it.listingId, shopId:it.shopId,
+        specs:it.specs, quantity:it.quantity, unitPrice:it.unitPrice,
+        totalAmount:total, commissionAmount:comm, shopPayoutAmount:total-comm,
+        status: it.shopId?'assigned':'placed',
+        rating:null, review:'',
+        address: pickup?'Pickup — customer will collect when ready':line,
+        delivery: pickup?'pickup':'delivery',
+        timeline:[{status:'placed', at:now()}, ...(it.shopId?[{status:'assigned',at:now()}]:[])],
+        createdAt:now()
+      };
+      // Auto-assign if somehow missing
+      if(!it.shopId){
+        const chosen = Data.autoAssignOrder(o);
+        if(chosen){
+          o.status='assigned'; o.timeline.push({status:'assigned',at:now()});
+        }
+      }
+      orders.unshift(o);
+      created.push(o);
+    });
+    Data.saveOrders(orders);
+    // Update shop ratings (no-op but keeps caches fresh)
+    Data.cart(); Data.saveCart([]); cart=[];
+    toast('Payment successful! 🎉','success');
+    setTimeout(()=>location.href='orders.html?highlight='+created[0].id, 600);
+  });
+}
+render();
+</script>
+</body>
+</html>

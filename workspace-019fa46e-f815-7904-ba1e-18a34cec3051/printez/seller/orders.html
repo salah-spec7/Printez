@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Seller · Orders</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+</head>
+<body>
+<div class="shell">
+  <div id="sidebar"></div>
+  <main class="main">
+    <button id="mobile-toggle" class="btn btn-outline mobile-toggle" style="margin-bottom:10px">☰ Menu</button>
+    <div id="content"></div>
+  </main>
+</div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+if(!requireAuth('seller')){/* redirected */}else{ render(); }
+
+let filter = 'active'; // active | ready | delivered | all
+const params = new URLSearchParams(location.search);
+const detailId = params.get('id');
+
+function render(){
+  document.getElementById('sidebar').innerHTML = renderSellerSidebar('orders');
+  bindSellerShell();
+  if(detailId){ renderDetail(); return; }
+  renderList();
+}
+
+function renderList(){
+  const shopId = Auth.seller().shopId;
+  const shop = Data.shopById(shopId);
+  let orders = Data.orders().filter(o=>o.shopId===shopId);
+  if(filter==='active') orders = orders.filter(o=>['placed','assigned','in_production'].includes(o.status));
+  else if(filter==='ready') orders = orders.filter(o=>['ready','out_for_delivery'].includes(o.status));
+  else if(filter==='delivered') orders = orders.filter(o=>o.status==='delivered');
+  orders.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+
+  document.getElementById('content').innerHTML = `
+    <h1 style="font-size:24px;font-weight:800">Orders</h1>
+    <p class="muted text-sm mb-16">Manage incoming orders and update status as you fulfil them.</p>
+    <div class="tabs mb-16" style="margin-bottom:16px">
+      ${[['active','To prepare'],['ready','Ready / Out'],['delivered','Delivered'],['all','All']].map(([id,l])=>`
+        <button class="tab ${filter===id?'active':''}" data-f="${id}">${l}</button>`).join('')}
+    </div>
+    ${orders.length===0 ? `<div class="card card-pad empty"><div class="ic">📭</div><h3>Nothing here</h3><p>No orders in this view yet.</p></div>` :
+    `<div style="display:flex;flex-direction:column;gap:10px">
+      ${orders.map(o=>{
+        const p=Data.productById(o.productId);
+        return `<a href="orders.html?id=${o.id}" class="order-mini">
+          <div class="order-mini-img">${productArt(p,100)}</div>
+          <div class="order-mini-body">
+            <div class="n">${p.name} × ${o.quantity}</div>
+            <div class="m">${o.id} · ${fmtDate(o.createdAt)}</div>
+            <div class="m">${o.delivery==='pickup'?'Pickup':'📍 '+o.address}</div>
+            <div style="margin-top:6px"><span class="badge ${STATUS_BADGE[o.status]}">${STATUS_LABEL[o.status]}</span></div>
+          </div>
+          <div class="order-mini-pr">${inr(o.totalAmount)}<div class="text-xs muted" style="font-weight:500">payout ${inr(o.shopPayoutAmount)}</div></div>
+        </a>`;
+      }).join('')}
+    </div>`}
+    <div style="height:40px"></div>
+  `;
+  document.querySelectorAll('[data-f]').forEach(t=>t.addEventListener('click',()=>{filter=t.dataset.f;render();}));
+}
+
+function renderDetail(){
+  const shopId = Auth.seller().shopId;
+  const o = Data.orders().find(x=>x.id===detailId && x.shopId===shopId);
+  if(!o){ location.href='orders.html'; return; }
+  const p=Data.productById(o.productId);
+  const idx=STATUS_FLOW.indexOf(o.status);
+  document.getElementById('content').innerHTML = `
+    <a href="orders.html" class="text-sm muted" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:12px">← All orders</a>
+    <div class="card" style="overflow:hidden">
+      <div class="card-pad flex flex-gap" style="gap:14px;background:linear-gradient(135deg,#ecfdf5,#fff);border-bottom:1px solid var(--ink-100)">
+        <div style="width:70px;height:70px;border-radius:12px;overflow:hidden;background:#fff;flex-shrink:0">${productArt(p,140)}</div>
+        <div style="flex:1"><span class="badge ${p.category==='print'?'badge-print':'badge-gifting'}">${p.category}</span>
+          <h2 style="font-size:20px;font-weight:800;margin-top:4px">${p.name}</h2>
+          <div class="text-xs muted">${o.id} · placed ${fmtDate(o.createdAt)}</div>
+        </div>
+        <div style="text-align:right"><div class="text-xs muted">Payout</div><div class="font-display font-extrabold" style="color:#059669;font-size:20px">${inr(o.shopPayoutAmount)}</div></div>
+      </div>
+      <div class="card-pad">
+        <div class="grid-2">
+          <div>
+            <div class="text-xs font-bold uppercase muted" style="letter-spacing:.06em;margin-bottom:6px">Specifications</div>
+            <div style="background:var(--ink-50);border-radius:10px;padding:10px;font-size:14px">
+              ${Object.entries(o.specs).filter(([k,v])=>v).map(([k,v])=>`<div><b>${k}:</b> ${v}</div>`).join('')}
+              <div><b>Quantity:</b> ${o.quantity}</div>
+            </div>
+          </div>
+          <div>
+            <div class="text-xs font-bold uppercase muted" style="letter-spacing:.06em;margin-bottom:6px">Customer</div>
+            <div style="background:var(--ink-50);border-radius:10px;padding:10px;font-size:14px">
+              <div><b>${o.customerName}</b></div>
+              <div>📞 ${o.customerPhone}</div>
+              <div>${o.delivery==='pickup'?'<b style="color:#059669">Customer will pick up</b>':'📍 '+o.address}</div>
+            </div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="text-xs font-bold uppercase muted" style="letter-spacing:.06em;margin-bottom:10px">Status</div>
+        <div class="stepper">
+          ${STATUS_FLOW.map((s,i)=>{
+            const done=i<idx,active=i===idx;
+            const ev=(o.timeline||[]).find(t=>t.status===s);
+            return `<div class="step ${done?'done':active?'active':''}">
+              <div class="dot">${done?'✓':i+1}</div>
+              <div class="step-info">
+                <div class="step-title">${STATUS_LABEL[s]}</div>
+                ${ev?`<div class="step-time">${fmtDate(ev.at)}</div>`:''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="divider"></div>
+        <div id="actions" style="display:flex;gap:8px;flex-wrap:wrap">${renderActions(o)}</div>
+        ${o.rating?`<div class="mt-16" style="margin-top:16px"><div class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Customer feedback</div>
+          <div class="stars">${'★'.repeat(o.rating)}<span class="empty">${'★'.repeat(5-o.rating)}</span></div>
+          ${o.review?`<div class="text-sm" style="margin-top:6px">${o.review}</div>`:''}</div>`:''}
+      </div>
+    </div>
+    <div style="height:40px"></div>`;
+  bindActions(o);
+}
+function renderActions(o){
+  if(o.status==='placed') return `<button class="btn btn-primary" data-act="accept" style="background:#059669">Accept order →</button> <button class="btn btn-danger" data-act="reject">Reject</button>`;
+  if(o.status==='assigned') return `<button class="btn btn-primary" data-act="start" style="background:#059669">Start production</button>`;
+  if(o.status==='in_production') return `<button class="btn btn-primary" data-act="ready">Mark as ready</button>`;
+  if(o.status==='ready') return `<button class="btn btn-primary" data-act="ofd" style="background:#ea580c">${o.delivery==='pickup'?'Mark picked up':'Hand to delivery'}</button>`;
+  if(o.status==='out_for_delivery') return `<button class="btn btn-primary" data-act="deliver" style="background:#15803d">Mark delivered</button>`;
+  return `<span class="badge badge-delivered">Completed</span>`;
+}
+function bindActions(o){
+  document.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',()=>{
+    const act=b.dataset.act;
+    const orders = Data.orders();
+    const target = orders.find(x=>x.id===o.id);
+    if(act==='accept'){ target.status='assigned'; target.timeline.push({status:'assigned',at:now()}); }
+    else if(act==='reject'){
+      target.shopId=null; target.listingId=null; target.status='placed'; target.timeline.push({status:'placed',at:now(),note:'rejected by shop, reassigned'});
+      Data.autoAssignOrder(target); if(target.shopId) target.timeline.push({status:'assigned',at:now()});
+    }
+    else if(act==='start'){ target.status='in_production'; target.timeline.push({status:'in_production',at:now()}); }
+    else if(act==='ready'){ target.status='ready'; target.timeline.push({status:'ready',at:now()}); }
+    else if(act==='ofd'){ target.status='out_for_delivery'; target.timeline.push({status:'out_for_delivery',at:now()}); }
+    else if(act==='deliver'){ target.status='delivered'; target.timeline.push({status:'delivered',at:now()}); }
+    Data.saveOrders(orders);
+    toast('Order updated','success');
+    render();
+  }));
+}
+</script>
+</body>
+</html>

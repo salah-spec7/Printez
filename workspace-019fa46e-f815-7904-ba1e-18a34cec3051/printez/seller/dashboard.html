@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Seller · Dashboard</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+</head>
+<body>
+<div class="shell">
+  <div id="sidebar"></div>
+  <main class="main">
+    <button id="mobile-toggle" class="btn btn-outline mobile-toggle" style="margin-bottom:10px">☰ Menu</button>
+    <div id="content"></div>
+  </main>
+</div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+if(!requireAuth('seller')){ /* redirected */ } else { render(); }
+
+function render(){
+  const shop = Data.shopById(Auth.seller().shopId);
+  const orders = Data.orders().filter(o=>o.shopId===shop.id);
+  const active = orders.filter(o=>['assigned','in_production','ready','out_for_delivery'].includes(o.status));
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayOrders = orders.filter(o=>new Date(o.createdAt)>=today);
+  const pending = orders.filter(o=>['assigned','in_production'].includes(o.status));
+  const earnings = orders.filter(o=>o.status==='delivered').reduce((s,o)=>s+o.shopPayoutAmount,0);
+  const todayEarnings = orders.filter(o=>o.status==='delivered' && new Date(o.createdAt)>=today).reduce((s,o)=>s+o.shopPayoutAmount,0);
+  const myListings = Data.shopListings(shop.id).filter(x=>x.listing.active);
+
+  document.getElementById('sidebar').innerHTML = renderSellerSidebar('dashboard');
+  bindSellerShell();
+
+  document.getElementById('content').innerHTML = `
+    <h1 style="font-size:24px;font-weight:800">Welcome back, ${shop.ownerName.split(' ')[0]} 👋</h1>
+    <p class="muted text-sm mb-16">${shop.name} · ${shop.address}</p>
+
+    <div class="grid-stats">
+      <div class="stat"><div class="lbl">New today</div><div class="val">${todayOrders.length}</div></div>
+      <div class="stat"><div class="lbl">To prepare</div><div class="val" style="color:var(--brand-700)">${pending.length}</div><div class="sub">assigned / in production</div></div>
+      <div class="stat"><div class="lbl">Ready / out</div><div class="val">${orders.filter(o=>['ready','out_for_delivery'].includes(o.status)).length}</div></div>
+      <div class="stat"><div class="lbl">Earnings (total)</div><div class="val" style="color:#059669">${inr(earnings)}</div><div class="sub">${inr(todayEarnings)} today</div></div>
+    </div>
+
+    <h2 class="section-title">Quick actions<span class="sub"><a href="products.html" class="btn btn-ghost btn-sm">Manage catalog →</a></span></h2>
+    <div class="grid-2">
+      <a href="orders.html" class="card card-pad" style="text-decoration:none">
+        <div style="font-size:26px">📦</div>
+        <div style="font-weight:700;margin-top:8px">Review orders</div>
+        <div class="text-sm muted">${pending.length} orders waiting for you. Accept and start production.</div>
+      </a>
+      <a href="add-product.html" class="card card-pad" style="text-decoration:none">
+        <div style="font-size:26px">➕</div>
+        <div style="font-weight:700;margin-top:8px">Add a new product</div>
+        <div class="text-sm muted">Add new catalog items or update prices on existing ones.</div>
+      </a>
+    </div>
+
+    <h2 class="section-title">Active orders<span class="sub"><a href="orders.html" class="text-sm" style="color:var(--brand-700);font-weight:600">See all →</a></span></h2>
+    ${active.length===0 ? `<div class="card card-pad empty"><div class="ic">☕</div><h3>No active orders</h3><p>When a customer places an order, it shows up here.</p></div>` :
+    `<div style="display:flex;flex-direction:column;gap:10px">${active.slice(0,5).map(o=>{
+      const p=Data.productById(o.productId);
+      return `<a href="orders.html?id=${o.id}" class="order-mini">
+        <div class="order-mini-img">${productArt(p,100)}</div>
+        <div class="order-mini-body">
+          <div class="n">${p.name} × ${o.quantity}</div>
+          <div class="m">${o.id} · ${fmtDateShort(o.createdAt)} · ${o.delivery==='pickup'?'Pickup':'Delivery'}</div>
+          <div style="margin-top:4px"><span class="badge ${STATUS_BADGE[o.status]}">${STATUS_LABEL[o.status]}</span></div>
+        </div>
+        <div class="order-mini-pr">${inr(o.shopPayoutAmount)}<div class="text-xs muted" style="font-weight:500">payout</div></div>
+      </a>`;
+    }).join('')}</div>`}
+
+    <h2 class="section-title">Your products<span class="sub">${myListings.length} live</span></h2>
+    ${myListings.length===0?`<div class="card card-pad empty"><div class="ic">🛍️</div><h3>No products yet</h3><p>Add products to start receiving orders.</p><a href="add-product.html" class="btn btn-primary">Add first product</a></div>`:
+    `<div class="grid-products">${myListings.slice(0,8).map(x=>{
+      const p=x.product, l=x.listing;
+      const price = computeStartingPrice(p,l);
+      return `<a href="products.html" class="pcard">
+        <div class="pcard-img">${productArt(p,240)}</div>
+        <div class="pcard-body"><div class="pcard-name">${p.name}</div><div class="pcard-sub">${p.tagline}</div>
+        <div class="pcard-row"><div class="pcard-price"><div class="from">Starting at</div><div><span class="val">${inr(price)}</span><span class="unit">/${p.unit}</span></div></div></div></div>
+      </a>`;
+    }).join('')}</div>`}
+
+    ${shop.avgRating!=null && shop.avgRating<3.5 ? `
+      <div class="card card-pad" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;margin-top:20px">
+        <b>⚠ Your rating is low (${shop.avgRating.toFixed(1)}★)</b>
+        <div class="text-sm" style="margin-top:4px">Customers have flagged issues recently. Check reviews and reach out to admin for support.</div>
+      </div>`:''}
+    <div style="height:40px"></div>
+  `;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Seller · Shop profile</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+</head>
+<body>
+<div class="shell">
+  <div id="sidebar"></div><main class="main">
+    <button id="mobile-toggle" class="btn btn-outline mobile-toggle" style="margin-bottom:10px">☰ Menu</button>
+    <div id="content"></div>
+  </main>
+</div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+if(!requireAuth('seller')){} else render();
+
+function render(){
+  document.getElementById('sidebar').innerHTML = renderSellerSidebar('profile');
+  bindSellerShell();
+  const shop = Data.shopById(Auth.seller().shopId);
+  const orders = Data.orders().filter(o=>o.shopId===shop.id);
+  const ratings = orders.filter(o=>o.rating!=null).map(o=>o.rating);
+
+  document.getElementById('content').innerHTML = `
+    <h1 style="font-size:24px;font-weight:800">Shop profile</h1>
+    <p class="muted text-sm mb-16">What customers see when they browse your shop.</p>
+    <div class="grid-2">
+      <div class="card card-pad">
+        <div style="width:72px;height:72px;border-radius:18px;background:#d1fae5;color:#065f46;display:grid;place-items:center;font-size:30px">🏪</div>
+        <div class="mt-16" style="margin-top:14px">
+          <label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Shop name</label>
+          <input id="name" class="input mt-8" value="${shop.name}" ${shop.status==='pending'?'':'disabled'}/>
+        </div>
+        <div class="mt-8"><label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Owner name</label><input id="owner" class="input mt-8" value="${shop.ownerName}" ${shop.status==='pending'?'':'disabled'}/></div>
+        <div class="mt-8"><label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Phone</label><input class="input mt-8" value="+91 ${shop.phone}" disabled/></div>
+        <div class="mt-8"><label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Address</label><textarea id="addr" class="textarea mt-8" ${shop.status==='pending'?'':'disabled'}>${shop.address}</textarea></div>
+        <div class="mt-8">
+          <label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Categories</label>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <span class="badge ${shop.categories.includes('print')?'badge-print':'badge'}">🖨️ Print${shop.categories.includes('print')?'':' (not offered)'}</span>
+            <span class="badge ${shop.categories.includes('gifting')?'badge-gifting':'badge'}">🎁 Gifting${shop.categories.includes('gifting')?'':' (not offered)'}</span>
+          </div>
+        </div>
+        ${shop.status!=='pending'?`<button id="edit" class="btn btn-ghost btn-sm mt-16" style="margin-top:14px">Edit details</button>`:''}
+        <button id="save" class="btn btn-primary btn-block mt-8" style="background:#059669;display:none">Save changes</button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card card-pad">
+          <div class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Account status</div>
+          <div style="margin-top:8px"><span class="badge ${{approved:'badge-approved',pending:'badge-pending',suspended:'badge-suspended'}[shop.status]}">${shop.status}</span></div>
+          <div class="text-sm muted mt-8" style="margin-top:8px">${shop.status==='approved'?'You are live and receiving orders. Keep your catalog and capacity up to date.':shop.status==='pending'?'We are reviewing your details. This usually takes a few hours.':''}</div>
+        </div>
+        <div class="card card-pad">
+          <div class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Customer rating</div>
+          <div class="flex flex-gap" style="gap:10px;align-items:baseline;margin-top:6px">
+            <div class="stars">${shop.avgRating?'★'.repeat(Math.round(shop.avgRating))+'<span class="empty">'+'★'.repeat(5-Math.round(shop.avgRating))+'</span>':'—'}</div>
+            <div class="font-display font-extrabold" style="font-size:22px">${shop.avgRating?shop.avgRating.toFixed(1):'New'}</div>
+          </div>
+          <div class="text-sm muted">${ratings.length} rating${ratings.length===1?'':'s'}</div>
+          ${shop.avgRating!=null && shop.avgRating<3.5?`<div class="flag mt-8" style="margin-top:10px">⚠ Rating below 3.5 — priority improvement</div>`:''}
+        </div>
+        <div class="card card-pad">
+          <div class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Quick stats</div>
+          <div class="grid-stats" style="margin-top:10px">
+            <div><div class="text-xs muted">Lifetime orders</div><div class="font-display font-extrabold" style="font-size:20px">${orders.length}</div></div>
+            <div><div class="text-xs muted">Delivered</div><div class="font-display font-extrabold" style="font-size:20px;color:var(--good)">${orders.filter(o=>o.status==='delivered').length}</div></div>
+          </div>
+        </div>
+        <div class="card card-pad" style="background:#fffbeb;border-color:#fde68a">
+          <b>💡 Pro tip</b>
+          <div class="text-sm" style="margin-top:4px">Keep 2–3 bestsellers always online and priced competitively to win the auto-assignment algorithm.</div>
+        </div>
+      </div>
+    </div>
+    <div style="height:40px"></div>
+  `;
+  bindSellerShell();
+  const edit=document.getElementById('edit');
+  if(edit) edit.addEventListener('click',()=>{
+    ['name','owner','addr'].forEach(id=>document.getElementById(id).disabled=false);
+    document.getElementById('save').style.display='block';
+  });
+  const save=document.getElementById('save');
+  if(save) save.addEventListener('click',()=>{
+    const shops=Data.shops();
+    const s=shops.find(x=>x.id===shop.id);
+    s.name=document.getElementById('name').value.trim();
+    s.ownerName=document.getElementById('owner').value.trim();
+    s.address=document.getElementById('addr').value.trim();
+    Data.saveShops(shops);
+    toast('Profile saved','success');
+    render();
+  });
+}
+</script>
+</body>
+</html>

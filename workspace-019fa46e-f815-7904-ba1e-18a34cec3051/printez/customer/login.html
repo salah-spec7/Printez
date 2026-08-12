@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script src="../assets/js/app.js"></script>
+<title>printez — Sign in</title>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><meta name="theme-color" content="#c2410c"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c2410c'/%3E%3Ctext x='16' y='22' font-family='Inter' font-size='18' font-weight='800' text-anchor='middle' fill='white'%3Epz%3C/text%3E%3C/svg%3E"/>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+</head>
+<body class="auth-wrap safe-top safe-bottom">
+  <div class="container-slim" style="padding-top:24px">
+    <a href="../index.html" class="brand" style="margin-bottom:22px;display:inline-flex"><div class="brand-logo">pz</div>printez</a>
+    <div class="auth-card">
+      <h1 id="title">Welcome</h1>
+      <p class="lead" id="subtitle">Sign in with your phone number to order from shops in Kharghar.</p>
+      <div id="msg"></div>
+      <form id="auth-form">
+        <div class="field" id="name-field" style="display:none">
+          <label>Your name</label>
+          <input class="input" id="name" placeholder="e.g. Ananya Rao"/>
+        </div>
+        <div class="field">
+          <label>Phone number</label>
+          <div class="flex" style="gap:8px">
+            <span class="input" style="width:auto;padding:11px 14px;background:var(--ink-100);flex-shrink:0">+91</span>
+            <input class="input" id="phone" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number" autocomplete="tel"/>
+          </div>
+        </div>
+        <div class="field" id="otp-field" style="display:none">
+          <label>One-time password (OTP)</label>
+          <input class="input" id="otp" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit code"/>
+          <div class="hint">Use any 6 digits for this prototype.</div>
+        </div>
+        <button class="btn btn-primary btn-block btn-lg" id="submit-btn" type="submit">Send OTP</button>
+      </form>
+      <div class="muted text-xs text-center mt-16">By continuing you agree to printez's Terms and Privacy Policy.</div>
+    </div>
+
+    <hr class="sep">
+    <details>
+      <summary class="text-sm font-bold" style="cursor:pointer;text-align:center">Demo quick-login (bypass OTP)</summary>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <button class="btn btn-outline btn-sm quick-login" data-phone="9000000001" data-name="Ananya Rao">Ananya R. (has order history)</button>
+        <button class="btn btn-outline btn-sm quick-login" data-phone="9000000099" data-name="Guest Shopper">Fresh guest (no orders)</button>
+      </div>
+    </details>
+  </div>
+
+<script>
+pageLoaded();
+const returnTo = new URLSearchParams(location.search).get('next') || 'index.html';
+const form = document.getElementById('auth-form');
+const phoneInput = document.getElementById('phone');
+const nameField = document.getElementById('name-field');
+const nameInput = document.getElementById('name');
+const otpField = document.getElementById('otp-field');
+const otpInput = document.getElementById('otp');
+const submitBtn = document.getElementById('submit-btn');
+const msg = document.getElementById('msg');
+let stage = 'phone';
+let known = false;
+
+function finishLogin(phone, name){
+  const sess = { id:'cust_demo_'+phone.slice(-4), phone, name: name||'Shopper', createdAt:now() };
+  Auth.setCustomer(sess);
+  const existing = JSON.parse(localStorage.getItem('pz_customers_v1')||'[]');
+  if(!existing.includes(phone)){ existing.push(phone); localStorage.setItem('pz_customers_v1',JSON.stringify(existing)); }
+  toast('Welcome to printez! 🧡','success');
+  setTimeout(()=>location.href=returnTo,500);
+}
+
+phoneInput.addEventListener('input', ()=>{
+  phoneInput.value = phoneInput.value.replace(/\D/g,'').slice(0,10);
+});
+document.querySelectorAll('.quick-login').forEach(b=>b.addEventListener('click',()=>{
+  finishLogin(b.dataset.phone, b.dataset.name);
+}));
+otpInput.addEventListener('input', ()=>{
+  otpInput.value = otpInput.value.replace(/\D/g,'').slice(0,6);
+});
+
+// Check if number exists (mock: we just track all customers locally)
+form.addEventListener('submit', (e)=>{
+  e.preventDefault();
+  if(stage==='phone'){
+    if(phoneInput.value.length!==10){ msg.innerHTML=`<div class="form-error">Enter a valid 10-digit mobile number.</div>`; return; }
+    msg.innerHTML='';
+    // fake send OTP
+    stage='otp';
+    otpField.style.display='block';
+    submitBtn.textContent='Verify & continue';
+    otpInput.focus();
+    toast('OTP sent (mock: enter any 6 digits)','info');
+    // If this is a "new number", ask for name
+    const existing = JSON.parse(localStorage.getItem('pz_customers_v1')||'[]');
+    known = existing.includes(phoneInput.value);
+    if(!known) nameField.style.display='block';
+  } else if(stage==='otp'){
+    if(otpInput.value.length!==6){ msg.innerHTML=`<div class="form-error">Enter the 6-digit OTP.</div>`; return; }
+    const name = nameInput.value.trim() || 'Shopper';
+    finishLogin(phoneInput.value, name);
+  }
+});
+</script>
+</body>
+</html>

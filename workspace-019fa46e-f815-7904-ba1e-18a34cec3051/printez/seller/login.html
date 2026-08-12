@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Seller · Sign in</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#059669"/>
+</head>
+<body class="auth-wrap">
+<div class="container-slim" style="padding-top:24px">
+  <a href="../index.html" class="brand" style="margin-bottom:22px;display:inline-flex"><div class="brand-logo" style="background:#059669">S</div>Seller portal</a>
+  <div class="auth-card">
+    <div class="flex-between" style="margin-bottom:8px">
+      <h1 id="title">Welcome back</h1>
+      <button id="toggle-tab" class="btn btn-ghost btn-sm" type="button">Create account</button>
+    </div>
+    <p class="lead" id="subtitle">Sign in to manage orders and your catalog.</p>
+    <div id="msg"></div>
+    <form id="f">
+      <div class="field" id="f-name" style="display:none"><label>Shop name</label><input class="input" id="shop" placeholder="e.g. Kharghar Print House"/></div>
+      <div class="field" id="f-owner" style="display:none"><label>Owner name</label><input class="input" id="owner" placeholder="Your full name"/></div>
+      <div class="field" id="f-cat" style="display:none"><label>Categories you offer</label>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <label class="chip"><input type="checkbox" id="cat-p" value="print" checked style="accent-color:var(--brand-600);margin-right:4px"/>🖨️ Print</label>
+          <label class="chip"><input type="checkbox" id="cat-g" value="gifting" style="accent-color:var(--brand-600);margin-right:4px"/>🎁 Gifting</label>
+        </div>
+      </div>
+      <div class="field" id="f-addr" style="display:none"><label>Shop address (Kharghar / Navi Mumbai)</label><input class="input" id="addr" placeholder="Shop no, society, sector, landmark"/></div>
+      <div class="field"><label>Phone number</label>
+        <div class="flex" style="gap:8px"><span class="input" style="width:auto;padding:11px 14px;background:var(--ink-100);flex-shrink:0">+91</span><input id="phone" class="input" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"/></div>
+      </div>
+      <div class="field" id="f-otp" style="display:none"><label>OTP</label><input id="otp" class="input" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit code"/><div class="hint">Use any 6 digits for this prototype.</div></div>
+      <button id="submit" class="btn btn-primary btn-block btn-lg" type="submit" style="background:#059669">Send OTP</button>
+    </form>
+    <div class="muted text-xs text-center mt-16">By continuing you agree to printez's Seller Terms.</div>
+
+    <hr class="sep">
+    <details>
+      <summary class="text-sm font-bold" style="cursor:pointer">Demo accounts (bypass OTP)</summary>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <button class="btn btn-outline btn-sm quick-login" data-phone="9820011223" data-id="shop_1">Shree Sai Printers (Print)</button>
+        <button class="btn btn-outline btn-sm quick-login" data-phone="9820144556" data-id="shop_2">Kharghar Gift Gallery (Gifting)</button>
+        <button class="btn btn-outline btn-sm quick-login" data-phone="9820333445" data-id="shop_3">NaviMug Creations (low rating)</button>
+      </div>
+    </details>
+  </div>
+</div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+let mode = 'signin'; // signin | signup
+let stage = 'phone';
+const f=document.getElementById('f');
+const msg=document.getElementById('msg');
+document.getElementById('toggle-tab').addEventListener('click',()=>{
+  mode = mode==='signin'?'signup':'signin';
+  document.getElementById('title').textContent = mode==='signin'?'Welcome back':'Create your shop';
+  document.getElementById('subtitle').textContent = mode==='signin'?'Sign in to manage orders and your catalog.':'Register your shop — admin reviews and approves within hours.';
+  document.getElementById('toggle-tab').textContent = mode==='signin'?'Create account':'Sign in instead';
+  ['f-name','f-owner','f-cat','f-addr'].forEach(id=>document.getElementById(id).style.display=mode==='signup'?'block':'none');
+  stage='phone'; document.getElementById('f-otp').style.display='none'; document.getElementById('submit').textContent='Send OTP';
+});
+document.getElementById('phone').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,10)});
+document.getElementById('otp').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,6)});
+
+f.addEventListener('submit',e=>{
+  e.preventDefault();
+  const ph=document.getElementById('phone').value;
+  if(ph.length!==10){ msg.innerHTML=`<div class="form-error">Enter a valid 10-digit mobile.</div>`; return;}
+  msg.innerHTML='';
+  if(stage==='phone'){
+    stage='otp';
+    document.getElementById('f-otp').style.display='block';
+    document.getElementById('submit').textContent = mode==='signup'?'Sign up shop':'Sign in';
+    document.getElementById('otp').focus();
+    toast('OTP sent (enter any 6 digits)','info');
+  } else {
+    const otp=document.getElementById('otp').value;
+    if(otp.length!==6){ msg.innerHTML=`<div class="form-error">Enter 6-digit OTP</div>`; return; }
+    let shop;
+    if(mode==='signup'){
+      const name=document.getElementById('shop').value.trim();
+      const owner=document.getElementById('owner').value.trim();
+      const addr=document.getElementById('addr').value.trim();
+      const cats=[];
+      if(document.getElementById('cat-p').checked) cats.push('print');
+      if(document.getElementById('cat-g').checked) cats.push('gifting');
+      if(!name||!owner||!addr||cats.length===0){ msg.innerHTML=`<div class="form-error">Fill in shop details and select at least one category.</div>`; return;}
+      const shops = Data.shops();
+      shop = { id:uid('shop'), name, ownerName:owner, phone:ph, email:'', address:addr, categories:cats, status:'pending', avgRating:null, createdAt:now(), listings:[] };
+      shops.push(shop);
+      Data.saveShops(shops);
+      toast('Application submitted! Wait for admin approval.','success');
+    } else {
+      shop = Data.shops().find(s=>s.phone===ph);
+      if(!shop){ msg.innerHTML=`<div class="form-error">No shop found with this number. Create an account instead.</div>`; return;}
+      if(shop.status==='pending'){ msg.innerHTML=`<div class="form-error">Your shop is pending admin approval. You'll get a WhatsApp when approved.</div>`; return;}
+      if(shop.status==='suspended'){ msg.innerHTML=`<div class="form-error">Your shop has been suspended. Contact support.</div>`; return;}
+    }
+    Auth.setSeller({ shopId:shop.id, phone:ph, name:shop.ownerName, loginAt:now() });
+    toast('Welcome, '+shop.name+'!','success');
+    setTimeout(()=>location.href='dashboard.html',500);
+  }
+});
+document.querySelectorAll('.quick-login').forEach(b=>b.addEventListener('click',()=>{
+  Auth.setSeller({ shopId:b.dataset.id, phone:b.dataset.phone, name:'Quick login', loginAt:now() });
+  toast('Signed in (demo)','success');
+  setTimeout(()=>location.href='dashboard.html',400);
+}));
+</script>
+</body>
+</html>

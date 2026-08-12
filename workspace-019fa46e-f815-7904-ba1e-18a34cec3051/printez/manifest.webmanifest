@@ -1,0 +1,17 @@
+{
+  "name": "printez — print & gifting, Kharghar",
+  "short_name": "printez",
+  "description": "Hyperlocal marketplace connecting customers to local print & gifting shops in Kharghar, Navi Mumbai.",
+  "start_url": "./customer/index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff7ed",
+  "theme_color": "#c2410c",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": ["shopping","local","business"],
+  "icons": [
+    { "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='110' fill='%23c2410c'/><text x='256' y='340' font-family='Inter,Arial' font-size='240' font-weight='800' text-anchor='middle' fill='white'>pz</text></svg>", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

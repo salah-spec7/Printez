@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Admin · Shops</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+</head>
+<body><div class="shell"><div id="sidebar"></div><main class="main">
+  <button id="mobile-toggle" class="btn btn-outline mobile-toggle" style="margin-bottom:10px">☰ Menu</button>
+  <div id="content"></div>
+</main></div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+if(!requireAuth('admin')){} else render();
+let tab = 'pending';
+function render(){
+  document.getElementById('sidebar').innerHTML = renderAdminSidebar('shops');
+  bindAdminShell();
+  const shops = Data.shops();
+  const pending = shops.filter(s=>s.status==='pending');
+  const approved = shops.filter(s=>s.status==='approved');
+  const suspended = shops.filter(s=>s.status==='suspended');
+  document.getElementById('content').innerHTML = `
+    <h1 style="font-size:24px;font-weight:800">Shops</h1>
+    <p class="muted text-sm mb-16">Review new signups and manage existing shops on the platform.</p>
+    <div class="tabs mb-16" style="margin-bottom:16px">
+      ${[['pending',`Pending (${pending.length})`],['approved',`Approved (${approved.length})`],['suspended',`Suspended (${suspended.length})`]].map(([v,l])=>`<button class="tab ${tab===v?'active':''}" data-t="${v}">${l}</button>`).join('')}
+    </div>
+    ${tab==='pending'?renderPending(pending):''}
+    ${tab==='approved'?renderList(approved):''}
+    ${tab==='suspended'?renderList(suspended):''}
+    <div style="height:40px"></div>`;
+  document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>{tab=b.dataset.t;render();}));
+  bindActions();
+}
+function renderPending(list){
+  if(!list.length) return `<div class="card card-pad empty"><div class="ic">🎉</div><h3>No pending applications</h3></div>`;
+  return `<div class="grid-2">${list.map(s=>`
+    <div class="card card-pad">
+      <div class="flex flex-gap" style="gap:12px"><div style="width:48px;height:48px;border-radius:14px;background:#fef3c7;color:#92400e;display:grid;place-items:center;font-size:22px">🏪</div>
+      <div style="flex:1;min-width:0"><div style="font-weight:700">${s.name}</div><div class="text-xs muted">Owner: ${s.ownerName} · ${s.phone}</div>
+        <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">${s.categories.map(c=>`<span class="badge ${c==='print'?'badge-print':'badge-gifting'}">${c}</span>`).join('')}</div>
+      </div></div>
+      <div class="text-sm muted mt-8" style="margin-top:10px">📍 ${s.address}</div>
+      <div class="text-xs muted mt-8" style="margin-top:6px">Applied ${fmtDate(s.createdAt)}</div>
+      <div class="flex flex-gap mt-8" style="margin-top:12px;gap:8px">
+        <button class="btn btn-primary flex-1" data-approve="${s.id}" style="background:#059669">Approve</button>
+        <button class="btn btn-danger flex-1" data-reject="${s.id}">Reject</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+function renderList(list){
+  if(!list.length) return `<div class="card card-pad muted text-center">No shops here yet.</div>`;
+  return `<div class="table-wrap"><table class="data">
+    <thead><tr><th>Shop</th><th>Owner</th><th>Categories</th><th>Listings</th><th>Rating</th><th>Status</th><th style="text-align:right">Actions</th></tr></thead>
+    <tbody>${list.map(s=>`
+      <tr><td><b>${s.name}</b><div class="text-xs muted">${s.address}</div></td>
+        <td>${s.ownerName}<div class="text-xs muted">${s.phone}</div></td>
+        <td>${s.categories.map(c=>`<span class="badge ${c==='print'?'badge-print':'badge-gifting'}">${c}</span>`).join(' ')}</td>
+        <td>${(s.listings||[]).length}</td>
+        <td>${s.avgRating?s.avgRating.toFixed(1)+' ★':'<span class="muted">—</span>'}${s.avgRating!=null&&s.avgRating<3.5?' <span class="flag">⚠</span>':''}</td>
+        <td><span class="badge ${s.status==='approved'?'badge-approved':'badge-suspended'}">${s.status}</span></td>
+        <td style="text-align:right">
+          ${s.status==='approved'?`<button class="btn btn-sm btn-outline" data-suspend="${s.id}">Suspend</button>`:`<button class="btn btn-sm btn-primary" style="background:#059669" data-reinstate="${s.id}">Reinstate</button>`}
+        </td>
+      </tr>`).join('')}</tbody></table></div>`;
+}
+function bindActions(){
+  document.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>{
+    const s=Data.shopById(b.dataset.approve); s.status='approved'; Data.saveShops(Data.shops()); toast(s.name+' approved','success'); render();
+  }));
+  document.querySelectorAll('[data-reject],[data-suspend]').forEach(b=>b.addEventListener('click',()=>{
+    const id=b.dataset.reject||b.dataset.suspend;
+    const s=Data.shopById(id); s.status='suspended'; Data.saveShops(Data.shops()); toast(s.name+' suspended/rejected','error'); render();
+  }));
+  document.querySelectorAll('[data-reinstate]').forEach(b=>b.addEventListener('click',()=>{
+    const s=Data.shopById(b.dataset.reinstate); s.status='approved'; Data.saveShops(Data.shops()); toast(s.name+' reinstated','success'); render();
+  }));
+}
+</script>
+</body>
+</html>

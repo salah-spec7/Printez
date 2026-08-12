@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Admin · Commission</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+</head>
+<body><div class="shell"><div id="sidebar"></div><main class="main">
+  <button id="mobile-toggle" class="btn btn-outline mobile-toggle" style="margin-bottom:10px">☰ Menu</button>
+  <div id="content"></div>
+</main></div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+if(!requireAuth('admin')){} else render();
+const today=new Date(); const monthAgo=new Date(); monthAgo.setDate(monthAgo.getDate()-30);
+let from = monthAgo.toISOString().slice(0,10), to = today.toISOString().slice(0,10);
+function render(){
+  document.getElementById('sidebar').innerHTML = renderAdminSidebar('commission');
+  bindAdminShell();
+  const orders = Data.orders().filter(o=>{
+    const d=new Date(o.createdAt); return d>=new Date(from) && d<=new Date(to+'T23:59:59');
+  });
+  const totalComm = orders.reduce((s,o)=>s+o.commissionAmount,0);
+  const totalGmv = orders.reduce((s,o)=>s+o.totalAmount,0);
+  const printComm = orders.filter(o=>Data.productById(o.productId).category==='print').reduce((s,o)=>s+o.commissionAmount,0);
+  const giftComm  = orders.filter(o=>Data.productById(o.productId).category==='gifting').reduce((s,o)=>s+o.commissionAmount,0);
+  const byShop={};
+  orders.filter(o=>o.shopId).forEach(o=>{
+    byShop[o.shopId]=byShop[o.shopId]||{orders:0,gmv:0,comm:0,payout:0};
+    byShop[o.shopId].orders++; byShop[o.shopId].gmv+=o.totalAmount; byShop[o.shopId].comm+=o.commissionAmount; byShop[o.shopId].payout+=o.shopPayoutAmount;
+  });
+  const rows = Object.entries(byShop).map(([sid,v])=>({shop:Data.shopById(sid),...v})).sort((a,b)=>b.comm-a.comm);
+
+  document.getElementById('content').innerHTML = `
+    <h1 style="font-size:24px;font-weight:800">Commission dashboard</h1>
+    <p class="muted text-sm mb-16">Platform take: <b style="color:var(--brand-700)">15%</b> on print · <b style="color:#be123c">25%</b> on gifting.</p>
+
+    <div class="card card-pad mb-16" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+      <input type="date" id="c-from" class="input" value="${from}"/>
+      <input type="date" id="c-to" class="input" value="${to}"/>
+      <button id="c-apply" class="btn btn-primary" style="background:#4f46e5">Apply</button>
+      <div class="text-xs muted" style="display:flex;align-items:center">Defaults to last 30 days</div>
+    </div>
+
+    <div class="grid-stats mb-16">
+      <div class="stat" style="background:linear-gradient(135deg,#4f46e5,#4338ca);color:#fff;border:none"><div class="lbl" style="color:#c7d2fe">Total commission</div><div class="val" style="color:#fff">${inr(totalComm)}</div></div>
+      <div class="stat"><div class="lbl">GMV in range</div><div class="val">${inr(totalGmv)}</div></div>
+      <div class="stat"><div class="lbl">🖨️ Print (15%)</div><div class="val">${inr(printComm)}</div></div>
+      <div class="stat"><div class="lbl">🎁 Gifting (25%)</div><div class="val" style="color:#be123c">${inr(giftComm)}</div></div>
+    </div>
+
+    <h2 class="section-title">By shop</h2>
+    <div class="table-wrap"><table class="data"><thead><tr><th>Shop</th><th style="text-align:right">Orders</th><th style="text-align:right">GMV</th><th style="text-align:right">Shop payout</th><th style="text-align:right">Commission</th></tr></thead>
+      <tbody>${rows.length===0?`<tr><td colspan="5" class="text-center muted" style="padding:30px">No data.</td></tr>`:
+      rows.map(r=>`<tr><td><b>${r.shop.name}</b><div class="text-xs muted">${r.shop.categories.join(' · ')}</div></td>
+        <td style="text-align:right">${r.orders}</td>
+        <td style="text-align:right">${inr(r.gmv)}</td>
+        <td style="text-align:right">${inr(r.payout)}</td>
+        <td style="text-align:right;color:#059669;font-weight:700">${inr(r.comm)}</td></tr>`).join('')}</tbody></table></div>
+    <div style="height:40px"></div>`;
+
+  document.getElementById('c-apply').addEventListener('click',()=>{
+    from=document.getElementById('c-from').value||from;
+    to=document.getElementById('c-to').value||to;
+    render();
+  });
+}
+</script>
+</body>
+</html>

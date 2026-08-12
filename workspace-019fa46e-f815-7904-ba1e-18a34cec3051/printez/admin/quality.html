@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Admin · Quality</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+</head>
+<body><div class="shell"><div id="sidebar"></div><main class="main">
+  <button id="mobile-toggle" class="btn btn-outline mobile-toggle" style="margin-bottom:10px">☰ Menu</button>
+  <div id="content"></div>
+</main></div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+if(!requireAuth('admin')){} else render();
+function render(){
+  document.getElementById('sidebar').innerHTML = renderAdminSidebar('quality');
+  bindAdminShell();
+  const approved = Data.shops().filter(s=>s.status==='approved').map(s=>{
+    const r = Data.orders().filter(o=>o.shopId===s.id && o.rating!=null);
+    s.ratings = r.map(o=>({rating:o.rating,review:o.review,orderId:o.id,customer:o.customerName}));
+    s.avgRating = r.length?r.reduce((a,b)=>a+b.rating,0)/r.length : null;
+    return s;
+  }).sort((a,b)=>(a.avgRating||6)-(b.avgRating||6));
+  const flagged = approved.filter(s=>s.avgRating!=null && s.avgRating<3.5);
+
+  document.getElementById('content').innerHTML = `
+    <h1 style="font-size:24px;font-weight:800">Shop quality</h1>
+    <p class="muted text-sm mb-16">Monitor customer ratings. Shops below <b>3.5★</b> are flagged.</p>
+
+    ${flagged.length?`<div class="card card-pad" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;margin-bottom:16px"><b>⚠ ${flagged.length} flagged shop${flagged.length>1?'s':''}:</b> ${flagged.map(s=>s.name).join(', ')}. Consider pausing new orders or reaching out.</div>`:''}
+
+    <div class="grid-2">
+      ${approved.map(s=>{
+        const f = s.avgRating!=null && s.avgRating<3.5;
+        const full = Math.round(s.avgRating||0);
+        return `<div class="card card-pad" style="${f?'border-color:#fecaca;background:#fff1f2':''}">
+          <div class="flex-between">
+            <div style="display:flex;gap:10px;align-items:center"><div style="width:40px;height:40px;border-radius:12px;background:${f?'#fee2e2':'#d1fae5'};color:${f?'#991b1b':'#065f46'};display:grid;place-items:center;font-size:18px">🏪</div>
+            <div><div style="font-weight:700">${s.name}</div><div class="text-xs muted">${s.categories.join(' · ')}</div></div></div>
+            ${f?`<span class="flag">⚠ Flagged</span>`:''}
+          </div>
+          <div class="flex flex-gap" style="gap:8px;align-items:baseline;margin-top:12px">
+            <div class="stars" style="font-size:22px;${f?'color:#b91c1c':''}">${s.avgRating?'★'.repeat(full)+`<span class="empty">${'★'.repeat(5-full)}</span>`:'—'}</div>
+            <div class="font-display font-extrabold" style="font-size:22px">${s.avgRating?s.avgRating.toFixed(1):'New'}</div>
+            <div class="text-xs muted">${s.ratings.length} rating${s.ratings.length===1?'':'s'}</div>
+          </div>
+          ${s.ratings.length?`<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">${s.ratings.slice(-3).reverse().map(r=>`<div style="background:var(--ink-50);border-radius:10px;padding:8px 10px;font-size:13px">
+            <div class="stars" style="font-size:13px;letter-spacing:1px">${'★'.repeat(r.rating)}<span class="empty">${'★'.repeat(5-r.rating)}</span><span class="muted" style="margin-left:6px">— ${r.customer}</span></div>
+            ${r.review?`<div style="margin-top:3px">${r.review}</div>`:''}
+          </div>`).join('')}</div>`:'<div class="text-xs muted" style="margin-top:10px">No ratings yet.</div>'}
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="height:40px"></div>`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#c2410c" />
+<title>printez — Print &amp; Gifting, Kharghar</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c2410c'/%3E%3Ctext x='16' y='22' font-family='system-ui' font-size='18' font-weight='800' text-anchor='middle' fill='white'%3Epz%3C/text%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23c2410c'/%3E%3Ctext x='90' y='120' font-family='system-ui' font-size='90' font-weight='800' text-anchor='middle' fill='white'%3Epz%3C/text%3E%3C/svg%3E" />
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22printez%22%2C%22short_name%22%3A%22printez%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23fff7ed%22%2C%22theme_color%22%3A%22%23c2410c%22%7D" />
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+        display: ['"Plus Jakarta Sans"', 'Inter', 'ui-sans-serif', 'system-ui'],
+      },
+      colors: {
+        brand: {
+          50:  '#fff7ed',
+          100: '#ffedd5',
+          200: '#fed7aa',
+          300: '#fdba74',
+          400: '#fb923c',
+          500: '#f97316',
+          600: '#ea580c',
+          700: '#c2410c',
+          800: '#9a3412',
+          900: '#7c2d12',
+        },
+        ink: {
+          50:  '#fafaf9',
+          100: '#f5f5f4',
+          200: '#e7e5e4',
+          300: '#d6d3d1',
+          500: '#78716c',
+          700: '#44403c',
+          900: '#1c1917',
+        }
+      },
+      boxShadow: {
+        card: '0 1px 2px rgba(28,25,23,0.04), 0 8px 24px -8px rgba(28,25,23,0.10)',
+        pop:  '0 10px 30px -10px rgba(194,65,12,0.35)',
+      }
+    }
+  }
+}
+</script>
+<style>
+  html, body { -webkit-tap-highlight-color: transparent; }
+  body { background: #fafaf9; color: #1c1917; font-family: 'Inter', system-ui, sans-serif; }
+  .font-display { font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif; letter-spacing: -0.01em; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .chip-active { background: #1c1917; color: #fff; }
+  .fade-in { animation: fadeIn .25s ease-out both; }
+  @keyframes fadeIn { from{opacity:0; transform: translateY(4px);} to{opacity:1; transform: none;} }
+  .shimmer { background: linear-gradient(110deg,#f5f5f4 8%,#e7e5e4 18%,#f5f5f4 33%); background-size:200% 100%; animation: shimmer 1.4s linear infinite; }
+  @keyframes shimmer { to { background-position-x: -200%; } }
+  /* iOS-style switch */
+  .switch { position: relative; width:40px; height:24px; background:#d6d3d1; border-radius:999px; transition:.2s; cursor:pointer; flex-shrink:0;}
+  .switch.on { background:#c2410c; }
+  .switch::after { content:''; position:absolute; top:2px; left:2px; width:20px; height:20px; background:white; border-radius:50%; transition:.2s; box-shadow:0 1px 2px rgba(0,0,0,.2);}
+  .switch.on::after { left:18px; }
+  .stepper-dot.active { background:#c2410c; color:white; border-color:#c2410c;}
+  .stepper-dot.done { background:#166534; color:white; border-color:#166534;}
+  .stepper-line.done { background:#166534; }
+  .star { cursor:pointer; transition: transform .1s;}
+  .star:hover { transform: scale(1.15);}
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .safe-top { padding-top: env(safe-area-inset-top); }
+  /* Hide number spinners */
+  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin:0; }
+  input[type=number] { -moz-appearance: textfield; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- ========================= APP ROOT ========================= -->
+<div id="app"></div>
+
+<!-- Bottom Nav (Customer only, mobile) / top utility -->
+<div id="nav-slot"></div>
+
+<!-- ========================= MODALS ========================= -->
+<div id="modal-root"></div>
+<div id="toast-root" class="fixed top-4 left-1/2 -translate-x-1/2 z-[80] space-y-2 w-[92%] max-w-sm"></div>
+
+<script>
+/* ============================================================
+   MOCK DATA
+============================================================ */
+const rupee = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
+
+const PRODUCTS = [
+  // Print
+  { id: 'vc',   name: 'Visiting Cards',     category: 'print',   unit: 'pc',     basePrice: 4,   image: 'card',    tagline: 'Premium matte & gloss finishes',
+    variants: { material: ['Standard Matte', 'Premium Gloss', 'Textured', 'Recycled'], hasSides: true, customSize: false, sizes: ['89x54 mm (Standard)', '90x54 mm (US)'] },
+    tiers: [[25,7],[50,5],[100,3.5],[500,2.5],[1000,1.5]]
+  },
+  { id: 'stk',  name: 'Stickers',           category: 'print',   unit: 'pc',     basePrice: 35,  image: 'sticker', tagline: 'Vinyl, paper & holographic',
+    variants: { material: ['Paper', 'Vinyl Matte', 'Vinyl Gloss', 'Holographic'], hasSides: false, customSize: true, sizes: [] },
+    tiers: [[25,35],[50,28],[100,24],[500,20],[1000,18]]
+  },
+  { id: 'bnr',  name: 'Banner Printing',    category: 'print',   unit: 'sq.ft',  basePrice: 20,  image: 'banner',  tagline: 'Flex, sunboard & fabric',
+    variants: { material: ['Flex (Standard)', 'Flex (Premium)', 'Sunboard 3mm', 'Sunboard 5mm', 'Fabric'], hasSides: false, customSize: true, sizes: [] },
+    tiers: [[10,20],[25,16],[50,14],[100,12]]
+  },
+  { id: 'flr',  name: 'Flyers & Brochures', category: 'print',   unit: 'pc',     basePrice: 8,   image: 'flyer',   tagline: 'A4 / A5, full color',
+    variants: { material: ['130gsm Gloss', '170gsm Matte', '250gsm Card'], hasSides: true, customSize: false, sizes: ['A5','A4','A6'] },
+    tiers: [[50,8],[100,5],[250,3.5],[500,2.5],[1000,1.8]]
+  },
+
+  // Gifting
+  { id: 'mug',  name: 'Personalized Mug',   category: 'gifting', unit: 'pc',     basePrice: 299, image: 'mug',     tagline: 'Ceramic, photo-printed', gifting: true,
+    variants: { options: ['White Ceramic – ₹299','Black Magic Mug – ₹449','Inside Color Mug – ₹399'] },
+    giftPrices: [299,449,399]
+  },
+  { id: 'frm',  name: 'Photo Frame',        category: 'gifting', unit: 'pc',     basePrice: 399, image: 'frame',   tagline: 'Wooden & acrylic finishes', gifting: true,
+    variants: { options: ['4x6" – ₹399','5x7" – ₹499','8x10" – ₹799','A4 Collage – ₹999'] },
+    giftPrices: [399,499,799,999]
+  },
+  { id: 'grt',  name: 'Custom Greeting Card', category: 'gifting', unit: 'pc',   basePrice: 99,  image: 'greet',   tagline: 'Folded, with envelope', gifting: true,
+    variants: { options: ['Single – ₹99','Pack of 5 – ₹399','Pack of 10 – ₹699'] },
+    giftPrices: [99,399,699], giftQuantities:[1,5,10]
+  },
+  { id: 'tsh',  name: 'Custom T-Shirt',     category: 'gifting', unit: 'pc',     basePrice: 499, image: 'tee',     tagline: 'Cotton, DTF print', gifting: true,
+    variants: { options: ['White – ₹499','Black – ₹549','Oversized – ₹699'] },
+    giftPrices: [499,549,699]
+  },
+];
+
+const SHOPS = [
+  { id:'s1', name:'Shree Sai Printers', ownerName:'Rajesh Patil', categories:['print'], status:'approved', avgRating:4.6, phone:'+91 98200 11223', address:'Shop 12, Sector 12, Kharghar', joined:'2024-08-14' },
+  { id:'s2', name:'Kharghar Gift Gallery', ownerName:'Meera Joshi', categories:['gifting'], status:'approved', avgRating:4.2, phone:'+91 98201 44556', address:'Plot 4, Utsav Chowk, Kharghar', joined:'2024-10-02' },
+  { id:'s3', name:'Om Digital Prints', ownerName:'Suresh Kumar', categories:['print','gifting'], status:'pending', avgRating:null, phone:'+91 98202 77889', address:'Shop 3, Shilp Chowk, Sector 20, Kharghar', joined:'2025-11-12' },
+  { id:'s4', name:'NaviMug Creations', ownerName:'Priya Shinde', categories:['gifting'], status:'approved', avgRating:3.2, phone:'+91 98203 33445', address:'Sector 10, Kharghar', joined:'2025-01-22' },
+  { id:'s5', name:'Bright Arts Studio', ownerName:'Amit Desai', categories:['print','gifting'], status:'pending', avgRating:null, phone:'+91 98204 99110', address:'Near Hiranandani Palace, Kharghar', joined:'2025-12-01' },
+];
+
+const STATUS_FLOW = ['placed','assigned','in_production','ready','out_for_delivery','delivered'];
+const STATUS_LABELS = {
+  placed:'Placed', assigned:'Assigned to Shop', in_production:'In Production',
+  ready:'Ready', out_for_delivery:'Out for Delivery', delivered:'Delivered'
+};
+
+function sampleOrders(){
+  const o = [];
+  const add = (x)=> o.push(Object.assign({
+    id:'ORD-'+(1000+o.length+1), customerName:'', productId:'', shopId:'', specs:{}, quantity:1,
+    totalAmount:0, commissionAmount:0, shopPayoutAmount:0, status:'placed', rating:null,
+    address:'', createdAt: new Date(Date.now() - Math.random()*10*86400000).toISOString()
+  },x));
+  add({customerName:'Ananya R.', productId:'vc',  shopId:'s1', specs:{material:'Premium Gloss', sides:'double', size:'89x54 mm (Standard)'}, quantity:500, totalAmount:1250, commissionAmount:188, shopPayoutAmount:1062, status:'delivered', rating:5, address:'B-402, Jalvayu Towers, Sector 20, Kharghar', createdAt: daysAgo(8)});
+  add({customerName:'Vikram M.', productId:'stk', shopId:'s1', specs:{material:'Vinyl Matte', size:'3x3 inch'}, quantity:100, totalAmount:2400, commissionAmount:360, shopPayoutAmount:2040, status:'delivered', rating:4, address:'Shop 8, Prime Mall, Sector 12, Kharghar', createdAt: daysAgo(6)});
+  add({customerName:'Sneha K.',  productId:'mug', shopId:'s2', specs:{option:'Black Magic Mug – ₹449'}, quantity:2, totalAmount:898,  commissionAmount:225, shopPayoutAmount:673, status:'out_for_delivery', address:'C-11, Nisarg Hyde Park, Sector 35E, Kharghar', createdAt: daysAgo(2)});
+  add({customerName:'Rahul D.',  productId:'bnr', shopId:'s1', specs:{material:'Sunboard 5mm', size:'8x6 ft (48 sq.ft)'}, quantity:48, totalAmount:672, commissionAmount:101, shopPayoutAmount:571, status:'ready', address:'Good Year Bakery, Sector 7, Kharghar', createdAt: daysAgo(1)});
+  add({customerName:'Priya S.',  productId:'frm', shopId:'s4', specs:{option:'8x10" – ₹799'}, quantity:1, totalAmount:799,  commissionAmount:200, shopPayoutAmount:599, status:'in_production', address:'A-504, Regency Gardens, Sector 6, Kharghar', createdAt: hoursAgo(14)});
+  add({customerName:'Arjun T.',  productId:'flr', shopId:'s1', specs:{material:'170gsm Matte', sides:'double', size:'A5'}, quantity:250, totalAmount:875, commissionAmount:131, shopPayoutAmount:744, status:'assigned', address:'Kharghar Railway Station, Sector 4', createdAt: hoursAgo(6)});
+  add({customerName:'Kavya P.',  productId:'grt', shopId:null, specs:{option:'Pack of 10 – ₹699'}, quantity:10, totalAmount:699, commissionAmount:175, shopPayoutAmount:524, status:'placed', address:'D-22, Bhoomi Gardenia, Roadpali, Kalamboli', createdAt: hoursAgo(1)});
+  add({customerName:'Ishaan B.', productId:'tsh', shopId:null, specs:{option:'Black – ₹549'}, quantity:3, totalAmount:1647, commissionAmount:412, shopPayoutAmount:1235, status:'placed', address:'1404, Paradise Sai Crystals, Sector 35D, Kharghar', createdAt: hoursAgo(3)});
+  add({customerName:'Neha G.',   productId:'mug', shopId:'s4', specs:{option:'White Ceramic – ₹299'}, quantity:1, totalAmount:299, commissionAmount:75, shopPayoutAmount:224, status:'delivered', rating:2, address:'E-702, Greenwoods, Sector 45, Kharghar', createdAt: daysAgo(10)});
+  return o;
+}
+function daysAgo(n){ return new Date(Date.now() - n*86400000).toISOString(); }
+function hoursAgo(n){ return new Date(Date.now() - n*3600000).toISOString(); }
+
+/* ============================================================
+   STATE
+============================================================ */
+const STATE = {
+  role: null,          // 'customer' | 'seller' | 'admin'
+  sellerShopId: 's1',  // default mock login
+  // customer
+  cart: [],            // {key, productId, specs, quantity, unitPrice, lineTotal}
+  activeCategory: 'all',
+  currentPage: { name:'catalog' }, // {name, params}
+  orders: sampleOrders(),
+  shops: SHOPS,
+  products: PRODUCTS,
+  lastOrderId: null,
+  toast: null,
+};
+
+/* ============================================================
+   HELPERS
+============================================================ */
+function productById(id){ return PRODUCTS.find(p=>p.id===id); }
+function shopById(id){ return SHOPS.find(s=>s.id===id); }
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) + ' · ' + d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+}
+function tierPrice(product, qty){
+  let price = product.basePrice;
+  for(const [t,p] of product.tiers){ if(qty>=t) price=p; }
+  return price;
+}
+function commissionFor(total, category){
+  // Print 15%, Gifting 25%
+  return Math.round(total * (category==='print' ? 0.15 : 0.25));
+}
+
+function calcPrintPrice(product, opts){
+  // opts: {quantity, materialIdx, sides, width, height}
+  const q = Math.max(1, parseInt(opts.quantity)||1);
+  let unitPrice = tierPrice(product, q);
+
+  // material multiplier
+  const matMult = [1, 1.25, 1.6, 1.8, 2.0]; // corresponds to variants.material index
+  unitPrice *= matMult[opts.materialIdx||0];
+
+  // sides multiplier
+  if(product.variants.hasSides && opts.sides==='double') unitPrice *= 1.7;
+
+  // area for custom-size print (stickers, banners)
+  let area = 1;
+  if(product.variants.customSize){
+    if(product.id==='bnr'){
+      const w = Math.max(0.5, parseFloat(opts.width)||1);
+      const h = Math.max(0.5, parseFloat(opts.height)||1);
+      area = Math.max(1, w*h);
+    } else if(product.id==='stk'){
+      const w = Math.max(0.5, parseFloat(opts.width)||2);
+      const h = Math.max(0.5, parseFloat(opts.height)||2);
+      area = (w*h)/9; // normalize to ~3x3" as 1 unit
+      area = Math.max(0.5, area);
+    }
+  }
+  return { unitPrice: unitPrice*area, quantity: q, total: unitPrice*area*q };
+}
+
+function toast(msg, kind='info'){
+  const root = document.getElementById('toast-root');
+  const colors = { info:'bg-ink-900', success:'bg-green-700', error:'bg-red-700' };
+  const el = document.createElement('div');
+  el.className = `${colors[kind]} text-white text-sm px-4 py-3 rounded-xl shadow-pop fade-in flex items-center gap-2`;
+  el.innerHTML = `<span class="text-base">${kind==='success'?'✓':kind==='error'?'✕':'ⓘ'}</span><span>${msg}</span>`;
+  root.appendChild(el);
+  setTimeout(()=>{ el.style.transition='opacity .3s'; el.style.opacity=0; setTimeout(()=>el.remove(),300); },2400);
+}
+
+/* ============================================================
+   ROUTER / RENDER
+============================================================ */
+function go(pageName, params={}){
+  STATE.currentPage = { name:pageName, params };
+  window.scrollTo({top:0, behavior:'instant'});
+  render();
+}
+
+function render(){
+  const root = document.getElementById('app');
+  const nav  = document.getElementById('nav-slot');
+  if(!STATE.role){
+    root.innerHTML = renderLogin();
+    nav.innerHTML = '';
+    bindLogin();
+    return;
+  }
+  if(STATE.role==='customer'){
+    root.innerHTML = renderCustomer();
+    nav.innerHTML  = renderCustomerNav();
+    bindCustomer();
+    bindNav();
+  } else if(STATE.role==='seller'){
+    root.innerHTML = renderSeller();
+    nav.innerHTML  = '';
+    bindSeller();
+  } else if(STATE.role==='admin'){
+    root.innerHTML = renderAdmin();
+    nav.innerHTML  = '';
+    bindAdmin();
+  }
+}
+
+/* ============================================================
+   LOGIN / ROLE SELECTOR
+============================================================ */
+function renderLogin(){
+  return `
+  <div class="min-h-screen flex flex-col bg-gradient-to-b from-brand-50 to-white safe-top safe-bottom">
+    <div class="flex-1 px-6 pt-12 pb-8 max-w-md mx-auto w-full">
+      <div class="flex items-center gap-3 mb-10">
+        <div class="w-12 h-12 rounded-2xl bg-brand-700 text-white grid place-items-center font-display font-extrabold text-xl shadow-pop">pz</div>
+        <div>
+          <div class="font-display text-2xl font-extrabold text-ink-900">printez</div>
+          <div class="text-xs text-ink-500">Print & gifting, made local · Kharghar</div>
+        </div>
+      </div>
+
+      <h1 class="font-display text-3xl font-extrabold text-ink-900 leading-tight">Pick up your print job from the shop next door.</h1>
+      <p class="text-ink-500 mt-3 mb-8">A hyperlocal marketplace connecting Kharghar with neighbourhood printers and gifting studios. Order in minutes, pick up or get same-day delivery.</p>
+
+      <div class="space-y-3">
+        <div class="text-xs font-semibold uppercase tracking-wider text-ink-500">Continue as</div>
+        <button data-role="customer" class="role-btn w-full text-left bg-white border border-ink-200 hover:border-brand-600 rounded-2xl p-4 flex items-center gap-4 transition shadow-card">
+          <div class="w-12 h-12 rounded-xl bg-brand-100 text-brand-700 grid place-items-center text-2xl">🛍️</div>
+          <div class="flex-1">
+            <div class="font-semibold text-ink-900">Customer</div>
+            <div class="text-sm text-ink-500">Browse, customize & order</div>
+          </div>
+          <div class="text-ink-300">→</div>
+        </button>
+
+        <button data-role="seller" class="role-btn w-full text-left bg-white border border-ink-200 hover:border-brand-600 rounded-2xl p-4 flex items-center gap-4 transition shadow-card">
+          <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 grid place-items-center text-2xl">🖨️</div>
+          <div class="flex-1">
+            <div class="font-semibold text-ink-900">Seller (Shop)</div>
+            <div class="text-sm text-ink-500">Fulfil orders, manage your shop</div>
+          </div>
+          <select id="seller-pick" class="text-sm bg-ink-50 border border-ink-200 rounded-lg px-2 py-1.5" onclick="event.stopPropagation()">
+            ${SHOPS.filter(s=>s.status==='approved').map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}
+          </select>
+        </button>
+
+        <button data-role="admin" class="role-btn w-full text-left bg-white border border-ink-200 hover:border-brand-600 rounded-2xl p-4 flex items-center gap-4 transition shadow-card">
+          <div class="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 grid place-items-center text-2xl">⚙️</div>
+          <div class="flex-1">
+            <div class="font-semibold text-ink-900">Platform Admin</div>
+            <div class="text-sm text-ink-500">Approve shops, assign orders</div>
+          </div>
+          <div class="text-ink-300">→</div>
+        </button>
+      </div>
+
+      <div class="mt-10 text-xs text-ink-500 text-center">
+        Prototype · Mock auth · No real payments
+      </div>
+    </div>
+  </div>`;
+}
+function bindLogin(){
+  document.querySelectorAll('.role-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const role = btn.dataset.role;
+      STATE.role = role;
+      if(role==='seller'){
+        const sel = document.getElementById('seller-pick');
+        STATE.sellerShopId = sel.value;
+      }
+      STATE.currentPage = { name: role==='customer'?'catalog': (role==='seller'?'s-orders':'a-shops') };
+      render();
+    });
+  });
+}
+
+/* ============================================================
+   CUSTOMER STOREFRONT
+============================================================ */
+function customerTopBar(){
+  const cartCount = STATE.cart.reduce((a,b)=>a+b.quantity,0);
+  return `
+  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-ink-100 safe-top">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+      <button id="home-btn" class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-xl bg-brand-700 text-white grid place-items-center font-display font-extrabold text-sm">pz</div>
+        <div class="hidden sm:block">
+          <div class="font-display font-extrabold text-ink-900 leading-none">printez</div>
+        </div>
+      </button>
+      <div class="flex-1 flex items-center gap-2 text-sm text-ink-700 bg-ink-50 rounded-full px-3 py-2 max-w-sm">
+        <span>📍</span>
+        <span class="truncate">Delivering to <b>Kharghar, Navi Mumbai</b></span>
+      </div>
+      <button id="cart-btn" class="relative w-10 h-10 rounded-full bg-ink-50 grid place-items-center hover:bg-ink-100 transition">
+        <span class="text-lg">🛒</span>
+        ${cartCount>0?`<span class="absolute -top-1 -right-1 bg-brand-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] grid place-items-center px-1">${cartCount}</span>`:''}
+      </button>
+      <button id="logout-c" class="hidden sm:flex w-10 h-10 rounded-full bg-ink-50 hover:bg-ink-100 grid place-items-center" title="Switch role">
+        <span>⎋</span>
+      </button>
+    </div>
+  </header>`;
+}
+
+function renderCustomer(){
+  const page = STATE.currentPage.name;
+  let content = '';
+  if(page==='catalog') content = renderCatalog();
+  else if(page==='product') content = renderProduct();
+  else if(page==='cart') content = renderCart();
+  else if(page==='tracking') content = renderTracking();
+  else content = renderCatalog();
+
+  return `
+    ${customerTopBar()}
+    <main class="max-w-6xl mx-auto px-4 pb-28 fade-in">
+      ${content}
+    </main>`;
+}
+
+function renderCustomerNav(){
+  const page = STATE.currentPage.name;
+  const items = [
+    {id:'catalog', icon:'🏠', label:'Shop'},
+    {id:'cart', icon:'🛒', label:'Cart'},
+    {id:'tracking', icon:'📦', label:'Orders'},
+  ];
+  const cartCount = STATE.cart.reduce((a,b)=>a+b.quantity,0);
+  return `
+  <nav class="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-ink-200 safe-bottom sm:hidden">
+    <div class="max-w-md mx-auto flex">
+      ${items.map(it=>{
+        const active = (page===it.id) || (it.id==='tracking' && page==='tracking');
+        return `<button data-nav="${it.id}" class="nav-btn flex-1 py-2.5 flex flex-col items-center gap-0.5 ${active?'text-brand-700':'text-ink-500'}">
+          <div class="relative text-xl">${it.icon}
+            ${it.id==='cart' && cartCount>0 ? `<span class="absolute -top-1 -right-2 bg-brand-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] grid place-items-center px-0.5">${cartCount}</span>`:''}
+          </div>
+          <div class="text-[11px] font-semibold">${it.label}</div>
+        </button>`;
+      }).join('')}
+      <button id="logout-c-m" class="flex-1 py-2.5 flex flex-col items-center gap-0.5 text-ink-500">
+        <div class="text-xl">⎋</div><div class="text-[11px] font-semibold">Switch</div>
+      </button>
+    </div>
+  </nav>`;
+}
+
+/* ---- Catalog ---- */
+function productArt(p, size=200){
+  // lightweight SVG illustrations per product
+  const palettes = { print:['#fff7ed','#fed7aa','#c2410c'], gift:['#fff1f2','#fecdd3','#be123c'] };
+  const [bg,mid,fg] = palettes[p.category];
+  const common = `<rect width="${size}" height="${size}" rx="16" fill="${bg}"/>`;
+  let art = '';
+  const cx = size/2, cy = size/2;
+  switch(p.image){
+    case 'card':
+      art = `<rect x="${cx-55}" y="${cy-35}" width="110" height="70" rx="6" fill="white" stroke="${fg}" stroke-width="2"/>
+             <rect x="${cx-45}" y="${cy-23}" width="50" height="5" rx="2" fill="${mid}"/>
+             <rect x="${cx-45}" y="${cy-12}" width="80" height="4" rx="2" fill="${mid}"/>
+             <rect x="${cx-45}" y="${cy-2}" width="60" height="4" rx="2" fill="${mid}"/>
+             <circle cx="${cx+35}" cy="${cy+18}" r="8" fill="${fg}"/>`;
+      break;
+    case 'sticker':
+      art = `<circle cx="${cx}" cy="${cy}" r="50" fill="white" stroke="${fg}" stroke-width="3" stroke-dasharray="4 3"/>
+             <path d="M${cx-25} ${cy+10} Q${cx} ${cy-30} ${cx+25} ${cy+10}" fill="${fg}"/>
+             <circle cx="${cx-15}" cy="${cy-5}" r="4" fill="white"/>
+             <circle cx="${cx+15}" cy="${cy-5}" r="4" fill="white"/>`;
+      break;
+    case 'banner':
+      art = `<rect x="${cx-70}" y="${cy-35}" width="140" height="50" fill="${fg}"/>
+             <polygon points="${cx-70},${cy+15} ${cx-55},${cy+25} ${cx-70},${cy+35}" fill="${fg}"/>
+             <polygon points="${cx+70},${cy+15} ${cx+55},${cy+25} ${cx+70},${cy+35}" fill="${fg}"/>
+             <rect x="${cx-50}" y="${cy-20}" width="100" height="8" rx="2" fill="white"/>
+             <rect x="${cx-40}" y="${cy-3}" width="80" height="6" rx="2" fill="${mid}"/>`;
+      break;
+    case 'flyer':
+      art = `<rect x="${cx-40}" y="${cy-55}" width="80" height="110" rx="4" fill="white" stroke="${fg}" stroke-width="2"/>
+             <rect x="${cx-32}" y="${cy-45}" width="64" height="22" rx="2" fill="${fg}"/>
+             <rect x="${cx-32}" y="${cy-15}" width="50" height="4" rx="2" fill="${mid}"/>
+             <rect x="${cx-32}" y="${cy-5}" width="64" height="4" rx="2" fill="${mid}"/>
+             <rect x="${cx-32}" y="${cy+5}" width="55" height="4" rx="2" fill="${mid}"/>`;
+      break;
+    case 'mug':
+      art = `<path d="M${cx-35} ${cy-30} L${cx-35} ${cy+30} Q${cx-35} ${cy+45} ${cx-15} ${cy+45} L${cx+20} ${cy+45} Q${cx+40} ${cy+45} ${cx+40} ${cy+30} L${cx+40} ${cy-30} Z" fill="white" stroke="${fg}" stroke-width="2"/>
+             <path d="M${cx+40} ${cy-15} Q${cx+65} ${cy-15} ${cx+65} ${cy+10} Q${cx+65} ${cy+30} ${cx+40} ${cy+25}" fill="none" stroke="${fg}" stroke-width="3"/>
+             <circle cx="${cx+5}" cy="${cy+10}" r="10" fill="${mid}"/>`;
+      break;
+    case 'frame':
+      art = `<rect x="${cx-50}" y="${cy-40}" width="100" height="80" rx="4" fill="#7c2d12"/>
+             <rect x="${cx-42}" y="${cy-32}" width="84" height="64" fill="${bg}"/>
+             <circle cx="${cx-20}" cy="${cy-10}" r="12" fill="${fg}"/>
+             <polygon points="${cx-25},${cy+25} ${cx-5},${cy-5} ${cx+25},${cy+25}" fill="${mid}"/>`;
+      break;
+    case 'greet':
+      art = `<rect x="${cx-50}" y="${cy-35}" width="100" height="70" rx="4" fill="white" stroke="${fg}" stroke-width="2"/>
+             <line x1="${cx}" y1="${cy-35}" x2="${cx}" y2="${cy+35}" stroke="${mid}" stroke-width="1.5"/>
+             <path d="M${cx+25} ${cy-10} Q${cx+35} ${cy-20} ${cx+45} ${cy-10}" fill="none" stroke="${fg}" stroke-width="2"/>
+             <circle cx="${cx+30}" cy="${cy-20}" r="3" fill="${fg}"/>
+             <circle cx="${cx-30}" cy="${cy+10}" r="3" fill="${fg}"/>`;
+      break;
+    case 'tee':
+      art = `<path d="M${cx-50} ${cy-30} L${cx-30} ${cy-45} L${cx-30} ${cy-35} L${cx+30} ${cy-35} L${cx+30} ${cy-45} L${cx+50} ${cy-30} L${cx+40} ${cy-5} L${cx+30} ${cy-5} L${cx+30} ${cy+50} L${cx-30} ${cy+50} L${cx-30} ${cy-5} L${cx-40} ${cy-5} Z" fill="white" stroke="${fg}" stroke-width="2"/>
+             <text x="${cx}" y="${cy+20}" text-anchor="middle" font-family="Inter" font-weight="800" font-size="16" fill="${fg}">pz</text>`;
+      break;
+  }
+  return `<svg viewBox="0 0 ${size} ${size}" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">${common}${art}</svg>`;
+}
+
+function renderCatalog(){
+  const cat = STATE.activeCategory;
+  const filtered = cat==='all' ? PRODUCTS : PRODUCTS.filter(p=>p.category===cat);
+  const print = filtered.filter(p=>p.category==='print');
+  const gift  = filtered.filter(p=>p.category==='gifting');
+
+  return `
+  <!-- Hero -->
+  <section class="mt-4 mb-6 relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-700 via-brand-600 to-brand-500 text-white p-6 sm:p-8 shadow-pop">
+    <div class="relative z-10 max-w-lg">
+      <div class="inline-block text-xs font-bold uppercase tracking-wider bg-white/20 rounded-full px-3 py-1 mb-3">🇮🇳 Kharghar · Same-day</div>
+      <h1 class="font-display text-2xl sm:text-4xl font-extrabold leading-tight">Print it.<br/>Gift it.<br/><span class="text-brand-200">Next door.</span></h1>
+      <p class="text-brand-100 text-sm sm:text-base mt-3">Visiting cards, stickers, banners & personalised gifts — made by local Kharghar shops.</p>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <div class="bg-white/15 backdrop-blur rounded-full px-3 py-1.5 text-xs font-semibold">⚡ Ready in hours</div>
+        <div class="bg-white/15 backdrop-blur rounded-full px-3 py-1.5 text-xs font-semibold">🚲 Hyperlocal delivery</div>
+        <div class="bg-white/15 backdrop-blur rounded-full px-3 py-1.5 text-xs font-semibold">💸 Fair local pricing</div>
+      </div>
+    </div>
+    <div class="absolute -right-10 -bottom-10 w-64 h-64 rounded-full bg-white/10"></div>
+    <div class="absolute right-10 top-6 w-24 h-24 rounded-full bg-brand-300/30"></div>
+  </section>
+
+  <!-- Category chips -->
+  <div class="flex gap-2 overflow-x-auto no-scrollbar mb-6 -mx-1 px-1">
+    ${['all','print','gifting'].map(c=>`
+      <button data-cat="${c}" class="cat-chip shrink-0 px-4 py-2 rounded-full border border-ink-200 text-sm font-semibold transition ${cat===c?'chip-active':'bg-white text-ink-700 hover:border-ink-900'}">
+        ${c==='all'?'All':c==='print'?'🖨️ Print':'🎁 Gifting'}
+      </button>`).join('')}
+  </div>
+
+  ${(cat==='all'||cat==='print') ? `
+  <section class="mb-8">
+    <div class="flex items-end justify-between mb-3">
+      <h2 class="font-display text-xl font-bold text-ink-900">🖨️ Print</h2>
+      <span class="text-xs text-ink-500">Tiered bulk pricing</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      ${print.map(p=>productCard(p)).join('')}
+    </div>
+  </section>`:''}
+
+  ${(cat==='all'||cat==='gifting') ? `
+  <section class="mb-8">
+    <div class="flex items-end justify-between mb-3">
+      <h2 class="font-display text-xl font-bold text-ink-900">🎁 Gifting</h2>
+      <span class="text-xs text-ink-500">Personalised in Kharghar</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      ${gift.map(p=>productCard(p)).join('')}
+    </div>
+  </section>`:''}
+
+  <!-- Why printez -->
+  <section class="mt-8 mb-6 grid grid-cols-3 gap-3">
+    ${[
+      {i:'🏷️',t:'Fair prices',d:'Direct from local shops — no big-store markup.'},
+      {i:'⚡',t:'Fast turnaround',d:'Most orders ready same-day within Kharghar.'},
+      {i:'🤝',t:'Trusted partners',d:'Only Kharghar-verified print & gift studios.'},
+    ].map(x=>`<div class="bg-white border border-ink-200 rounded-2xl p-4">
+      <div class="text-2xl mb-1">${x.i}</div>
+      <div class="font-bold text-sm text-ink-900">${x.t}</div>
+      <div class="text-xs text-ink-500 mt-1">${x.d}</div>
+    </div>`).join('')}
+  </section>
+  `;
+}
+function productCard(p){
+  return `
+  <button data-product="${p.id}" class="product-card group text-left bg-white border border-ink-200 hover:border-brand-600 rounded-2xl overflow-hidden shadow-card hover:shadow-pop transition">
+    <div class="aspect-square bg-ink-50 overflow-hidden">${productArt(p)}</div>
+    <div class="p-3 sm:p-4">
+      <div class="flex items-start justify-between gap-2">
+        <div class="font-semibold text-ink-900 text-sm sm:text-base leading-snug">${p.name}</div>
+      </div>
+      <div class="text-xs text-ink-500 mt-0.5 line-clamp-1">${p.tagline}</div>
+      <div class="mt-2 flex items-baseline justify-between">
+        <div>
+          <span class="text-[10px] font-semibold uppercase text-ink-500">from</span>
+          <div class="font-display font-extrabold text-brand-700 text-lg leading-none">${rupee(p.basePrice)}<span class="text-xs text-ink-500 font-semibold">/${p.unit}</span></div>
+        </div>
+        <div class="text-xs text-brand-700 font-semibold group-hover:translate-x-0.5 transition">Configure →</div>
+      </div>
+    </div>
+  </button>`;
+}
+
+/* ---- Product Config ---- */
+let CONFIG = {}; // live config for current product
+function renderProduct(){
+  const p = productById(STATE.currentPage.params.id);
+  if(!p){ go('catalog'); return ''; }
+  CONFIG = {
+    materialIdx:0, sides:'single', quantity: p.gifting?1: (p.id==='bnr'?24:100),
+    width: p.id==='bnr'?6 : (p.id==='stk'?3:0),
+    height: p.id==='bnr'?4 : (p.id==='stk'?3:0),
+    sizeIdx:0, giftIdx:0, photoUploaded:false
+  };
+  const price = livePrice(p);
+  return `
+  <div class="py-4">
+    <button id="back-btn" class="text-sm text-ink-500 hover:text-ink-900 mb-3 flex items-center gap-1">← Back to catalog</button>
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="bg-white rounded-3xl border border-ink-200 overflow-hidden shadow-card">
+        <div class="aspect-square bg-ink-50" id="art-slot">${productArt(p, 400)}</div>
+        <div class="p-5">
+          <div class="text-xs font-semibold uppercase tracking-wider text-brand-700">${p.category==='print'?'Print':'Gifting'}</div>
+          <h1 class="font-display text-2xl font-extrabold text-ink-900 mt-1">${p.name}</h1>
+          <p class="text-ink-500 text-sm mt-1">${p.tagline}</p>
+          <div class="mt-4 p-3 bg-brand-50 border border-brand-100 rounded-xl text-sm text-brand-900">
+            ${p.category==='print'
+              ? `💡 Bulk pricing — the more you order, the less you pay per ${p.unit}.`
+              : `🎁 Personalise this item with your photo / message at the shop.`}
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        ${p.category==='print' ? renderPrintConfig(p) : renderGiftConfig(p)}
+        ${p.category==='print' ? renderTierPreview(p) : ''}
+
+        <!-- Price sticky card -->
+        <div class="sticky bottom-20 sm:bottom-4 bg-ink-900 text-white rounded-2xl p-4 shadow-pop">
+          <div class="flex items-end justify-between">
+            <div>
+              <div class="text-xs text-ink-300 uppercase tracking-wider font-semibold" id="qty-label">${CONFIG.quantity} ${p.unit}${CONFIG.quantity>1?'s':''}</div>
+              <div class="font-display text-3xl font-extrabold" id="total-label">${rupee(price.total)}</div>
+              <div class="text-xs text-ink-400" id="unit-label">${rupee(price.unitPrice)} per ${p.unit}</div>
+            </div>
+            <button id="add-cart" class="bg-brand-500 hover:bg-brand-400 active:scale-95 transition text-white font-bold px-5 py-3 rounded-xl shadow-pop">
+              Add to cart
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+function renderPrintConfig(p){
+  return `
+    ${p.variants.sizes && p.variants.sizes.length ? `
+    <div class="bg-white rounded-2xl p-4 border border-ink-200 shadow-card">
+      <label class="text-xs font-bold uppercase tracking-wider text-ink-500">Size</label>
+      <select id="cfg-size" class="cfg-in mt-2 w-full bg-ink-50 border border-ink-200 rounded-xl px-3 py-3 text-ink-900 font-medium">
+        ${p.variants.sizes.map((s,i)=>`<option value="${i}">${s}</option>`).join('')}
+      </select>
+    </div>`:''}
+
+    ${p.variants.customSize ? `
+    <div class="bg-white rounded-2xl p-4 border border-ink-200 shadow-card">
+      <label class="text-xs font-bold uppercase tracking-wider text-ink-500">Dimensions ${p.id==='bnr'?'(feet)':'(inches)'}</label>
+      <div class="grid grid-cols-2 gap-3 mt-2">
+        <div>
+          <div class="text-xs text-ink-500 mb-1">Width</div>
+          <input id="cfg-w" type="number" min="0.5" step="0.5" value="${CONFIG.width}" class="cfg-in w-full bg-ink-50 border border-ink-200 rounded-xl px-3 py-3 font-medium"/>
+        </div>
+        <div>
+          <div class="text-xs text-ink-500 mb-1">Height</div>
+          <input id="cfg-h" type="number" min="0.5" step="0.5" value="${CONFIG.height}" class="cfg-in w-full bg-ink-50 border border-ink-200 rounded-xl px-3 py-3 font-medium"/>
+        </div>
+      </div>
+      ${p.id==='bnr' ? `<div class="text-xs text-ink-500 mt-2" id="area-label"></div>`:''}
+    </div>`:''}
+
+    <div class="bg-white rounded-2xl p-4 border border-ink-200 shadow-card">
+      <label class="text-xs font-bold uppercase tracking-wider text-ink-500">Material / Type</label>
+      <select id="cfg-mat" class="cfg-in mt-2 w-full bg-ink-50 border border-ink-200 rounded-xl px-3 py-3 text-ink-900 font-medium">
+        ${p.variants.material.map((m,i)=>`<option value="${i}">${m}</option>`).join('')}
+      </select>
+    </div>
+
+    ${p.variants.hasSides?`
+    <div class="bg-white rounded-2xl p-4 border border-ink-200 shadow-card">
+      <label class="text-xs font-bold uppercase tracking-wider text-ink-500">Printed sides</label>
+      <div class="grid grid-cols-2 gap-2 mt-2">
+        <button data-side="single" class="side-btn cfg-in py-3 rounded-xl border font-semibold text-sm ${CONFIG.sides==='single'?'bg-ink-900 text-white border-ink-900':'bg-white border-ink-200 text-ink-700'}">Single-sided</button>
+        <button data-side="double" class="side-btn cfg-in py-3 rounded-xl border font-semibold text-sm ${CONFIG.sides==='double'?'bg-ink-900 text-white border-ink-900':'bg-white border-ink-200 text-ink-700'}">Double-sided (+70%)</button>
+      </div>
+    </div>`:''}
+
+    <div class="bg-white rounded-2xl p-4 border border-ink-200 shadow-card">
+      <div class="flex items-center justify-between">
+        <label class="text-xs font-bold uppercase tracking-wider text-ink-500">Quantity</label>
+        <div class="text-xs text-ink-500" id="tier-hint"></div>
+      </div>
+      <div class="flex items-center gap-3 mt-2">
+        <button id="qty-minus" class="w-11 h-11 rounded-xl bg-ink-100 hover:bg-ink-200 text-xl font-bold">−</button>
+        <input id="cfg-qty" type="number" min="1" value="${CONFIG.quantity}" class="cfg-in flex-1 text-center bg-ink-50 border border-ink-200 rounded-xl px-3 py-3 text-lg font-display font-extrabold"/>
+        <button id="qty-plus" class="w-11 h-11 rounded-xl bg-ink-100 hover:bg-ink-200 text-xl font-bold">+</button>
+      </div>
+      <div class="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
+        ${quickQtyButtons(p).map(q=>`<button data-qty="${q}" class="qty-chip cfg-in shrink-0 px-3 py-1.5 rounded-full border border-ink-200 text-xs font-semibold hover:border-ink-900">${q}${p.unit==='sq.ft'?' sq.ft':' pcs'}</button>`).join('')}
+      </div>
+    </div>`;
+}
+function quickQtyButtons(p){
+  if(p.id==='bnr') return [12,24,48,100];
+  return p.tiers.map(t=>t[0]);
+}
+function renderGiftConfig(p){
+  return `
+    <div class="bg-white rounded-2xl p-4 border border-ink-200 shadow-card">
+      <label class="text-xs font-bold uppercase tracking-wider text-ink-500">Choose a variant</label>
+      <div class="mt-2 space-y-2">
+        ${p.variants.options.map((o,i)=>`
+          <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${CONFIG.giftIdx===i?'border-brand-600 bg-brand-50':'border-ink-200 hover:border-ink-900'}">
+            <input type="radio" name="gift-opt" value="${i}" class="accent-brand-600" ${CONFIG.giftIdx===i?'checked':''}/>
+            <div class="flex-1 text-sm font-semibold text-ink-900">${o}</div>
+          </label>`).join('')}
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-ink-200 shadow-card">
+      <label class="text-xs font-bold uppercase tracking-wider text-ink-500">Quantity</label>
+      <div class="flex items-center gap-3 mt-2">
+        <button id="qty-minus" class="w-11 h-11 rounded-xl bg-ink-100 hover:bg-ink-200 text-xl font-bold">−</button>
+        <input id="cfg-qty" type="number" min="1" value="${CONFIG.quantity}" class="cfg-in flex-1 text-center bg-ink-50 border border-ink-200 rounded-xl px-3 py-3 text-lg font-display font-extrabold"/>
+        <button id="qty-plus" class="w-11 h-11 rounded-xl bg-ink-100 hover:bg-ink-200 text-xl font-bold">+</button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-ink-200 shadow-card">
+      <label class="text-xs font-bold uppercase tracking-wider text-ink-500">Personalisation photo</label>
+      <div id="photo-upload" class="mt-2 border-2 border-dashed border-ink-200 rounded-xl p-6 text-center cursor-pointer hover:border-brand-600 transition">
+        <div class="text-3xl">🖼️</div>
+        <div class="text-sm font-semibold mt-1" id="photo-label">Tap to upload photo</div>
+        <div class="text-xs text-ink-500 mt-0.5">We'll send this to the shop after checkout (mock)</div>
+      </div>
+    </div>
+  `;
+}
+function renderTierPreview(p){
+  return `
+    <div class="bg-white rounded-2xl p-4 border border-ink-200 shadow-card">
+      <div class="text-xs font-bold uppercase tracking-wider text-ink-500 mb-2">Bulk pricing (per ${p.unit})</div>
+      <div class="grid grid-cols-5 gap-2 text-center">
+        ${p.tiers.map(([t,pr],i)=>{
+          const isActive = tierActive(p, CONFIG.quantity)===i;
+          return `<div class="rounded-xl py-2 text-xs ${isActive?'bg-brand-600 text-white':'bg-ink-50 text-ink-700'}">
+            <div class="font-bold">${t}+</div>
+            <div class="font-display font-extrabold">${rupee(pr)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+function tierActive(p, q){
+  let idx=0;
+  for(let i=0;i<p.tiers.length;i++){ if(q>=p.tiers[i][0]) idx=i; }
+  return idx;
+}
+function livePrice(p){
+  if(p.category==='print'){
+    return calcPrintPrice(p, { quantity:CONFIG.quantity, materialIdx:CONFIG.materialIdx, sides:CONFIG.sides, width:CONFIG.width, height:CONFIG.height });
+  } else {
+    const unit = p.giftPrices[CONFIG.giftIdx];
+    return { unitPrice:unit, quantity:CONFIG.quantity, total:unit*CONFIG.quantity };
+  }
+}
+function updatePriceLabels(){
+  const p = productById(STATE.currentPage.params.id);
+  const price = livePrice(p);
+  const tl = document.getElementById('total-label');
+  const ul = document.getElementById('unit-label');
+  const ql = document.getElementById('qty-label');
+  if(!tl) return;
+  tl.textContent = rupee(price.total);
+  ul.textContent = `${rupee(price.unitPrice)} per ${p.unit}`;
+  ql.textContent = `${price.quantity} ${p.unit}${price.quantity>1 && p.unit!=='sq.ft'?'s':''}${p.id==='bnr' && CONFIG.width && CONFIG.height ? ` (${CONFIG.width}×${CONFIG.height} ft)`:''}`;
+  if(p.id==='bnr'){
+    const area = (parseFloat(CONFIG.width)||0)*(parseFloat(CONFIG.height)||0);
+    const al = document.getElementById('area-label');
+    if(al) al.textContent = `Total area: ${area.toFixed(1)} sq.ft`;
+  }
+  // tier hint
+  if(p.category==='print'){
+    const hint = document.getElementById('tier-hint');
+    if(hint){
+      const next = p.tiers.find(t=>t[0]>CONFIG.quantity);
+      hint.textContent = next ? `Add ${next[0]-CONFIG.quantity} more → ${rupee(next[1])}/${p.unit}` : 'Best tier applied 🎉';
+    }
+    // refresh active tier visuals
+    document.querySelectorAll('.tier-chip').forEach(()=>{});
+  }
+}
+
+function bindProduct(){
+  const p = productById(STATE.currentPage.params.id);
+  if(!p) return;
+  const refresh = ()=>{ updatePriceLabels(); renderTierHighlight(p); };
+  document.querySelectorAll('.cfg-in').forEach(el=>{
+    el.addEventListener('input', ()=>{
+      readConfig(p);
+      refresh();
+    });
+    el.addEventListener('change', ()=>{ readConfig(p); refresh(); });
+  });
+  document.querySelectorAll('.side-btn').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      CONFIG.sides = b.dataset.side;
+      document.querySelectorAll('.side-btn').forEach(x=>x.className='side-btn cfg-in py-3 rounded-xl border font-semibold text-sm bg-white border-ink-200 text-ink-700');
+      b.className='side-btn cfg-in py-3 rounded-xl border font-semibold text-sm bg-ink-900 text-white border-ink-900';
+      refresh();
+    });
+  });
+  document.querySelectorAll('input[name="gift-opt"]').forEach(r=>{
+    r.addEventListener('change', ()=>{ CONFIG.giftIdx = parseInt(r.value); refresh(); bindProduct(); /* re-render to update card */
+      // lighter: don't re-render everything — just update classes
+      document.querySelectorAll('label:has(input[name="gift-opt"])').forEach(l=>l.className='flex items-center gap-3 p-3 rounded-xl border cursor-pointer border-ink-200 hover:border-ink-900');
+      r.parentElement.className='flex items-center gap-3 p-3 rounded-xl border cursor-pointer border-brand-600 bg-brand-50';
+    });
+  });
+  document.getElementById('qty-minus').addEventListener('click', ()=>{
+    CONFIG.quantity = Math.max(1, CONFIG.quantity-(p.id==='bnr'?1: (p.gifting?1:25)));
+    const q = document.getElementById('cfg-qty'); q.value = CONFIG.quantity; refresh();
+  });
+  document.getElementById('qty-plus').addEventListener('click', ()=>{
+    CONFIG.quantity += (p.id==='bnr'?1: (p.gifting?1:25));
+    const q = document.getElementById('cfg-qty'); q.value = CONFIG.quantity; refresh();
+  });
+  document.querySelectorAll('.qty-chip').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      CONFIG.quantity = parseInt(b.dataset.qty);
+      document.getElementById('cfg-qty').value = CONFIG.quantity;
+      refresh();
+    });
+  });
+  const pu = document.getElementById('photo-upload');
+  if(pu){
+    pu.addEventListener('click', ()=>{
+      CONFIG.photoUploaded = true;
+      document.getElementById('photo-label').textContent = '✓ Photo ready (mock)';
+      pu.classList.add('border-green-600','bg-green-50');
+    });
+  }
+  document.getElementById('add-cart').addEventListener('click', ()=>{
+    const price = livePrice(p);
+    const specs = p.category==='print' ? {
+      material: p.variants.material[CONFIG.materialIdx],
+      sides: p.variants.hasSides ? CONFIG.sides : null,
+      size: p.variants.customSize ? `${CONFIG.width}×${CONFIG.height} ${p.id==='bnr'?'ft':'in'}` : p.variants.sizes[CONFIG.sizeIdx||0],
+    } : { option: p.variants.options[CONFIG.giftIdx] };
+    STATE.cart.push({
+      key: Math.random().toString(36).slice(2,8),
+      productId: p.id, specs,
+      quantity: price.quantity,
+      unitPrice: price.unitPrice,
+      lineTotal: price.total,
+      photoUploaded: CONFIG.photoUploaded
+    });
+    toast(`Added ${p.name} to cart`, 'success');
+    setTimeout(()=>go('cart'), 300);
+  });
+  refresh();
+}
+function readConfig(p){
+  const mat = document.getElementById('cfg-mat'); if(mat) CONFIG.materialIdx = parseInt(mat.value);
+  const size = document.getElementById('cfg-size'); if(size) CONFIG.sizeIdx = parseInt(size.value);
+  const qty = document.getElementById('cfg-qty'); if(qty) CONFIG.quantity = Math.max(1, parseInt(qty.value)||1);
+  const w = document.getElementById('cfg-w'); if(w) CONFIG.width = parseFloat(w.value)||1;
+  const h = document.getElementById('cfg-h'); if(h) CONFIG.height = parseFloat(h.value)||1;
+}
+function renderTierHighlight(p){
+  // re-render tier preview quickly
+  const host = document.getElementById('tier-host');
+  // (we rely on full re-render; no-op here to keep it simple)
+}
+
+/* ---- Cart / Checkout ---- */
+function renderCart(){
+  const items = STATE.cart;
+  const subtotal = items.reduce((s,i)=>s+i.lineTotal,0);
+  const delivery = subtotal>0 ? (subtotal>500?0:49) : 0;
+  const total = subtotal+delivery;
+  return `
+  <div class="py-4">
+    <h1 class="font-display text-2xl font-extrabold text-ink-900 mb-4">Your cart</h1>
+    ${items.length===0 ? `
+      <div class="bg-white rounded-2xl border border-ink-200 p-10 text-center">
+        <div class="text-5xl mb-3">🛒</div>
+        <div class="font-bold text-ink-900">Your cart is empty</div>
+        <div class="text-sm text-ink-500 mb-4">Browse print & gifting products to get started.</div>
+        <button id="shop-now" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-5 py-2.5 rounded-xl">Browse catalog</button>
+      </div>` : `
+      <div class="space-y-3">
+        ${items.map((it,idx)=>{
+          const p = productById(it.productId);
+          return `<div class="bg-white rounded-2xl border border-ink-200 p-3 flex gap-3 items-center shadow-card">
+            <div class="w-20 h-20 rounded-xl overflow-hidden bg-ink-50 shrink-0">${productArt(p,160)}</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-ink-900 truncate">${p.name}</div>
+              <div class="text-xs text-ink-500 truncate">${Object.entries(it.specs).filter(([k,v])=>v).map(([k,v])=>v).join(' · ')}</div>
+              <div class="flex items-center justify-between mt-1">
+                <div class="text-sm text-ink-500">${it.quantity} × ${rupee(it.unitPrice)}</div>
+                <div class="font-display font-extrabold text-ink-900">${rupee(it.lineTotal)}</div>
+              </div>
+            </div>
+            <button data-remove="${idx}" class="remove-item w-9 h-9 rounded-full bg-ink-50 hover:bg-red-50 hover:text-red-600 text-ink-500 grid place-items-center">✕</button>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="mt-6 bg-white rounded-2xl border border-ink-200 p-4 shadow-card">
+        <div class="text-xs font-bold uppercase tracking-wider text-ink-500 mb-3">Delivery address</div>
+        <input id="addr-name" type="text" placeholder="Your name" class="w-full bg-ink-50 border border-ink-200 rounded-xl px-3 py-2.5 mb-2 text-sm"/>
+        <input id="addr-phone" type="tel" placeholder="Phone number" class="w-full bg-ink-50 border border-ink-200 rounded-xl px-3 py-2.5 mb-2 text-sm"/>
+        <textarea id="addr-line" rows="2" placeholder="Flat / Shop, Society, Sector, Landmark — Kharghar / Navi Mumbai" class="w-full bg-ink-50 border border-ink-200 rounded-xl px-3 py-2.5 text-sm"></textarea>
+        <label class="flex items-center gap-2 mt-3 text-sm text-ink-700">
+          <input type="checkbox" id="pickup" class="accent-brand-600"/>
+          Pick up from shop (save delivery)
+        </label>
+      </div>
+
+      <div class="mt-4 bg-white rounded-2xl border border-ink-200 p-4 shadow-card">
+        <div class="flex justify-between text-sm py-1"><span class="text-ink-500">Subtotal</span><span class="font-semibold">${rupee(subtotal)}</span></div>
+        <div class="flex justify-between text-sm py-1"><span class="text-ink-500">Delivery${subtotal>500?' (free over ₹500)':''}</span><span class="font-semibold">${delivery?rupee(delivery):'FREE'}</span></div>
+        <div class="border-t border-ink-100 my-2"></div>
+        <div class="flex justify-between items-baseline"><span class="font-bold">Total</span><span class="font-display font-extrabold text-2xl text-brand-700">${rupee(total)}</span></div>
+      </div>
+
+      <div class="sticky bottom-20 sm:bottom-4 mt-4 bg-ink-900 text-white rounded-2xl p-4 shadow-pop flex items-center justify-between">
+        <div>
+          <div class="text-xs text-ink-400">Total</div>
+          <div class="font-display text-2xl font-extrabold">${rupee(total)}</div>
+        </div>
+        <button id="pay-now" class="bg-brand-500 hover:bg-brand-400 font-bold px-6 py-3 rounded-xl shadow-pop">Pay Now ⚡</button>
+      </div>
+      `}
+  </div>`;
+}
+function bindCart(){
+  document.querySelectorAll('.remove-item').forEach(b=>{
+    b.addEventListener('click',()=>{
+      STATE.cart.splice(parseInt(b.dataset.remove),1);
+      render();
+    });
+  });
+  const shop = document.getElementById('shop-now');
+  if(shop) shop.addEventListener('click',()=>go('catalog'));
+  const pay = document.getElementById('pay-now');
+  if(pay){
+    pay.addEventListener('click', ()=>{
+      const name = document.getElementById('addr-name').value.trim() || 'Customer';
+      const phone = document.getElementById('addr-phone').value.trim() || '';
+      const line  = document.getElementById('addr-line').value.trim() || 'Kharghar, Navi Mumbai';
+      const pickup = document.getElementById('pickup').checked;
+      // Create orders
+      const newIds = [];
+      STATE.cart.forEach(it=>{
+        const p = productById(it.productId);
+        const total = it.lineTotal;
+        const comm = commissionFor(total, p.category);
+        // auto-assign to first eligible approved shop
+        const eligible = SHOPS.filter(s=>s.status==='approved' && s.categories.includes(p.category));
+        const shop = eligible[Math.floor(Math.random()*eligible.length)] || null;
+        const o = {
+          id: 'ORD-'+(1200+STATE.orders.length+newIds.length+1),
+          customerName: name,
+          phone,
+          productId: p.id,
+          shopId: shop?shop.id:null,
+          specs: it.specs,
+          quantity: it.quantity,
+          totalAmount: it.lineTotal,
+          commissionAmount: comm,
+          shopPayoutAmount: it.lineTotal-comm,
+          status: shop?'assigned':'placed',
+          rating:null,
+          address: pickup?'Pickup — will notify when ready':line,
+          delivery: pickup?'pickup':'delivery',
+          createdAt: new Date().toISOString()
+        };
+        STATE.orders.unshift(o);
+        newIds.push(o.id);
+      });
+      STATE.cart = [];
+      STATE.lastOrderId = newIds[0];
+      toast('Payment successful 🎉', 'success');
+      setTimeout(()=>go('tracking', {id:newIds[0]}), 400);
+    });
+  }
+}
+
+/* ---- Order tracking ---- */
+function renderTracking(){
+  // Show list if no specific order; show detail if params.id
+  const params = STATE.currentPage.params||{};
+  const customerOrders = STATE.orders; // in a real app filter by session user; here show all sample orders placed
+  if(params.id){
+    const o = STATE.orders.find(x=>x.id===params.id);
+    return renderTrackingDetail(o);
+  }
+  return `
+  <div class="py-4">
+    <h1 class="font-display text-2xl font-extrabold text-ink-900 mb-1">Your orders</h1>
+    <p class="text-sm text-ink-500 mb-5">Track fulfilment from local Kharghar shops.</p>
+    <div class="space-y-3">
+      ${customerOrders.length===0?`<div class="bg-white rounded-2xl border border-ink-200 p-8 text-center text-ink-500">No orders yet.</div>`:
+      customerOrders.map(o=>{
+        const p = productById(o.productId);
+        const shop = shopById(o.shopId);
+        return `<button data-order="${o.id}" class="order-row w-full text-left bg-white border border-ink-200 rounded-2xl p-4 shadow-card hover:border-brand-600 transition flex gap-3 items-center">
+          <div class="w-14 h-14 rounded-xl bg-ink-50 overflow-hidden shrink-0">${productArt(p,120)}</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-2">
+              <div class="font-semibold text-ink-900 truncate">${p.name}</div>
+              <div class="font-display font-extrabold text-ink-900 text-sm shrink-0">${rupee(o.totalAmount)}</div>
+            </div>
+            <div class="text-xs text-ink-500 truncate">${o.id} · ${fmtDate(o.createdAt)}</div>
+            <div class="mt-1.5 flex items-center gap-2">
+              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${statusColor(o.status)}">${STATUS_LABELS[o.status]}</span>
+              ${shop?`<span class="text-xs text-ink-500 truncate">by ${shop.name}</span>`:'<span class="text-xs text-amber-700">Assigning shop…</span>'}
+            </div>
+          </div>
+        </button>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+function renderTrackingDetail(o){
+  if(!o){ setTimeout(()=>go('tracking'),0); return ''; }
+  const p = productById(o.productId);
+  const shop = shopById(o.shopId);
+  const idx = STATUS_FLOW.indexOf(o.status);
+  return `
+  <div class="py-4">
+    <button id="back-orders" class="text-sm text-ink-500 hover:text-ink-900 mb-3">← All orders</button>
+    <div class="bg-white rounded-2xl border border-ink-200 overflow-hidden shadow-card">
+      <div class="p-5 flex gap-4 items-start bg-gradient-to-br from-brand-50 to-white border-b border-ink-100">
+        <div class="w-20 h-20 rounded-xl bg-white overflow-hidden shrink-0 border border-ink-200">${productArt(p,160)}</div>
+        <div class="flex-1">
+          <div class="text-xs font-bold uppercase tracking-wider text-brand-700">${p.category==='print'?'Print order':'Gift order'}</div>
+          <h2 class="font-display text-xl font-extrabold text-ink-900">${p.name}</h2>
+          <div class="text-sm text-ink-500">${o.id} · ${fmtDate(o.createdAt)}</div>
+          <div class="text-xs text-ink-500 mt-1 line-clamp-2">${Object.values(o.specs).filter(Boolean).join(' · ')}</div>
+        </div>
+        <div class="text-right">
+          <div class="text-xs text-ink-500">Total</div>
+          <div class="font-display font-extrabold text-brand-700 text-xl">${rupee(o.totalAmount)}</div>
+        </div>
+      </div>
+
+      ${shop?`
+        <div class="p-4 flex items-center gap-3 border-b border-ink-100">
+          <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 grid place-items-center text-lg">🏪</div>
+          <div class="flex-1">
+            <div class="text-xs text-ink-500">Fulfilled by</div>
+            <div class="font-semibold text-ink-900">${shop.name}</div>
+            <div class="text-xs text-ink-500">${shop.address}</div>
+          </div>
+          <button class="text-xs font-semibold bg-ink-50 hover:bg-ink-100 rounded-full px-3 py-1.5">Call</button>
+        </div>`:''}
+
+      <div class="p-5">
+        <div class="text-xs font-bold uppercase tracking-wider text-ink-500 mb-4">Order status</div>
+        <div class="relative">
+          ${STATUS_FLOW.map((s,i)=>{
+            const done = i<idx, active = i===idx;
+            const label = STATUS_LABELS[s];
+            const isLast = i===STATUS_FLOW.length-1;
+            return `<div class="flex gap-3">
+              <div class="flex flex-col items-center">
+                <div class="stepper-dot w-9 h-9 rounded-full border-2 border-ink-200 grid place-items-center text-xs font-bold ${done?'done':active?'active':'bg-white text-ink-400'}">
+                  ${done?'✓':i+1}
+                </div>
+                ${!isLast?`<div class="w-0.5 flex-1 min-h-[22px] ${i<idx?'stepper-line done':'bg-ink-200'}"></div>`:''}
+              </div>
+              <div class="pb-4 flex-1">
+                <div class="font-semibold text-sm ${done||active?'text-ink-900':'text-ink-400'}">${label}</div>
+                <div class="text-xs text-ink-500">${stepBlurb(s, shop)}</div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <div class="p-5 border-t border-ink-100 bg-ink-50/50">
+        <div class="text-xs font-bold uppercase tracking-wider text-ink-500 mb-1">Delivering to</div>
+        <div class="text-sm text-ink-900">${o.customerName}</div>
+        <div class="text-sm text-ink-700">${o.address}</div>
+      </div>
+
+      ${o.status==='delivered' ? renderRatingBox(o) : ''}
+    </div>
+  </div>`;
+}
+function stepBlurb(s, shop){
+  switch(s){
+    case 'placed': return 'Your order is on its way to a nearby Kharghar shop.';
+    case 'assigned': return shop?`${shop.name} accepted your order.`:'';
+    case 'in_production': return 'The shop is preparing your order.';
+    case 'ready': return 'Ready for pickup / handoff to delivery partner.';
+    case 'out_for_delivery': return 'On its way to you now.';
+    case 'delivered': return 'Hope you love it! Let us know how it went.';
+  }
+}
+function statusColor(s){
+  return {
+    placed:'bg-amber-100 text-amber-800',
+    assigned:'bg-blue-100 text-blue-800',
+    in_production:'bg-purple-100 text-purple-800',
+    ready:'bg-indigo-100 text-indigo-800',
+    out_for_delivery:'bg-orange-100 text-orange-800',
+    delivered:'bg-green-100 text-green-800'
+  }[s];
+}
+function renderRatingBox(o){
+  const rated = o.rating!=null;
+  return `<div id="rate-box" class="p-5 border-t border-ink-100">
+    <div class="font-bold text-ink-900">How was your experience?</div>
+    <div class="text-sm text-ink-500 mb-3">Rate ${shopById(o.shopId)?.name||'the shop'} — your feedback helps Kharghar find better local makers.</div>
+    <div class="flex items-center gap-1 text-3xl" id="stars">
+      ${[1,2,3,4,5].map(n=>`<span class="star ${rated && n<=o.rating?'text-amber-400':'text-ink-300'}" data-star="${n}">★</span>`).join('')}
+    </div>
+    <textarea id="rate-text" rows="2" placeholder="Optional feedback…" class="mt-3 w-full bg-ink-50 border border-ink-200 rounded-xl px-3 py-2 text-sm ${rated?'hidden':''}"></textarea>
+    <button id="rate-submit" class="mt-3 bg-brand-600 hover:bg-brand-700 text-white font-semibold px-4 py-2 rounded-xl text-sm ${rated?'hidden':''}">Submit rating</button>
+    ${rated?`<div class="mt-2 text-sm text-green-700 font-semibold">Thanks for your feedback! 🧡</div>`:''}
+  </div>`;
+}
+function bindTracking(){
+  document.querySelectorAll('.order-row').forEach(b=>{
+    b.addEventListener('click', ()=>go('tracking', {id:b.dataset.order}));
+  });
+  const back = document.getElementById('back-orders');
+  if(back) back.addEventListener('click', ()=>go('tracking'));
+  const rateBox = document.getElementById('rate-box');
+  if(rateBox){
+    let selected = 0;
+    const stars = rateBox.querySelectorAll('.star');
+    stars.forEach(s=>{
+      s.addEventListener('click', ()=>{
+        selected = parseInt(s.dataset.star);
+        stars.forEach(x=>{
+          const n = parseInt(x.dataset.star);
+          x.className = 'star ' + (n<=selected?'text-amber-400':'text-ink-300');
+        });
+      });
+    });
+    const submit = document.getElementById('rate-submit');
+    submit.addEventListener('click', ()=>{
+      if(!selected){ toast('Tap a star to rate','error'); return; }
+      const o = STATE.orders.find(x=>x.id===STATE.currentPage.params.id);
+      o.rating = selected;
+      // update shop avg
+      const shop = shopById(o.shopId);
+      if(shop){
+        const ratings = STATE.orders.filter(x=>x.shopId===shop.id && x.rating!=null).map(x=>x.rating);
+        shop.avgRating = ratings.reduce((a,b)=>a+b,0)/ratings.length;
+      }
+      toast('Rating submitted','success');
+      render();
+    });
+  }
+}
+
+/* ---- Customer bindings ---- */
+function bindCustomer(){
+  // global
+  const home = document.getElementById('home-btn'); if(home) home.addEventListener('click',()=>go('catalog'));
+  const cart = document.getElementById('cart-btn'); if(cart) cart.addEventListener('click',()=>go('cart'));
+  const lc = document.getElementById('logout-c'); if(lc) lc.addEventListener('click',logout);
+  const lcm = document.getElementById('logout-c-m'); if(lcm) lcm.addEventListener('click',logout);
+  const back = document.getElementById('back-btn'); if(back) back.addEventListener('click',()=>go('catalog'));
+
+  if(STATE.currentPage.name==='catalog'){
+    document.querySelectorAll('.cat-chip').forEach(c=>{
+      c.addEventListener('click', ()=>{ STATE.activeCategory = c.dataset.cat; render(); });
+    });
+    document.querySelectorAll('.product-card').forEach(c=>{
+      c.addEventListener('click', ()=>go('product',{id:c.dataset.product}));
+    });
+  }
+  if(STATE.currentPage.name==='product') bindProduct();
+  if(STATE.currentPage.name==='cart') bindCart();
+  if(STATE.currentPage.name==='tracking') bindTracking();
+}
+function bindNav(){
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    b.addEventListener('click', ()=>go(b.dataset.nav));
+  });
+}
+function logout(){
+  STATE.role=null; STATE.cart=[]; STATE.currentPage={name:'catalog'}; render();
+}
+
+/* ============================================================
+   SELLER DASHBOARD
+============================================================ */
+let SELLER_TAB = 'orders';
+function renderSeller(){
+  const shop = shopById(STATE.sellerShopId);
+  const myOrders = STATE.orders.filter(o=>o.shopId===shop.id);
+  return `
+  <div class="min-h-screen bg-ink-50">
+    <!-- Top bar -->
+    <header class="bg-white border-b border-ink-200 safe-top sticky top-0 z-20">
+      <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white grid place-items-center font-display font-extrabold text-sm">${shop.name[0]}</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-[10px] uppercase tracking-wider font-bold text-emerald-700">Seller Dashboard</div>
+          <div class="font-display font-extrabold text-ink-900 truncate">${shop.name}</div>
+        </div>
+        <div class="flex items-center gap-2 text-sm">
+          <div class="hidden sm:flex items-center gap-1 text-ink-500">
+            <span class="text-amber-400">★</span><span class="font-bold text-ink-900">${shop.avgRating?shop.avgRating.toFixed(1):'—'}</span>
+          </div>
+          <button id="s-logout" class="text-sm bg-ink-100 hover:bg-ink-200 rounded-full px-3 py-1.5 font-semibold">Switch</button>
+        </div>
+      </div>
+      <div class="max-w-5xl mx-auto px-4 flex gap-1 overflow-x-auto no-scrollbar">
+        ${[['orders','Orders'],['profile','Shop Profile']].map(([id,label])=>`
+          <button data-tab="${id}" class="s-tab px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 ${SELLER_TAB===id?'border-emerald-600 text-emerald-700':'border-transparent text-ink-500 hover:text-ink-900'}">${label}</button>
+        `).join('')}
+      </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 py-6 fade-in">
+      ${SELLER_TAB==='orders' ? renderSellerOrders(shop, myOrders) : renderSellerProfile(shop)}
+    </main>
+  </div>`;
+}
+function renderSellerOrders(shop, orders){
+  const pending = orders.filter(o=>['assigned','in_production','ready','out_for_delivery'].includes(o.status));
+  const completed = orders.filter(o=>o.status==='delivered');
+  const stats = [
+    {label:'Pending', value:pending.length, color:'bg-amber-100 text-amber-800'},
+    {label:'Ready today', value:orders.filter(o=>o.status==='ready').length, color:'bg-indigo-100 text-indigo-800'},
+    {label:'Delivered', value:completed.length, color:'bg-green-100 text-green-800'},
+    {label:'Earnings (₹)', value:orders.filter(o=>o.status==='delivered').reduce((s,o)=>s+o.shopPayoutAmount,0).toLocaleString('en-IN'), color:'bg-emerald-100 text-emerald-800'},
+  ];
+  return `
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      ${stats.map(s=>`<div class="bg-white rounded-2xl border border-ink-200 p-4 shadow-card">
+        <div class="text-xs text-ink-500 font-semibold">${s.label}</div>
+        <div class="font-display text-2xl font-extrabold mt-1">${s.value}</div>
+      </div>`).join('')}
+    </div>
+
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-display text-lg font-extrabold">Active orders</h2>
+    </div>
+
+    ${pending.length===0 ? `<div class="bg-white rounded-2xl border border-ink-200 p-8 text-center text-ink-500">No active orders right now. Take a chai break ☕</div>`:
+    `<div class="space-y-3">
+      ${pending.map(o=>{
+        const p = productById(o.productId);
+        return `<div class="bg-white rounded-2xl border border-ink-200 p-4 shadow-card">
+          <div class="flex items-start gap-3">
+            <div class="w-16 h-16 rounded-xl overflow-hidden bg-ink-50 shrink-0">${productArt(p,120)}</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="font-semibold text-ink-900">${p.name} <span class="text-xs text-ink-500 font-normal">× ${o.quantity}</span></div>
+                  <div class="text-xs text-ink-500">${o.id} · ${fmtDate(o.createdAt)}</div>
+                </div>
+                <div class="text-right">
+                  <div class="font-display font-extrabold text-ink-900">${rupee(o.totalAmount)}</div>
+                  <div class="text-[10px] text-emerald-700 font-semibold">Payout ${rupee(o.shopPayoutAmount)}</div>
+                </div>
+              </div>
+              <div class="mt-2 text-xs text-ink-700 bg-ink-50 rounded-lg p-2">
+                <b>Specs:</b> ${Object.values(o.specs).filter(Boolean).join(' · ')}
+              </div>
+              <div class="mt-2 text-xs text-ink-700">
+                <b>📍 ${o.delivery==='pickup'?'Pickup':'Delivery'}:</b> ${o.address}
+                ${o.phone?`<br/><b>📞 ${o.phone}</b>`:''}
+              </div>
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${statusColor(o.status)}">${STATUS_LABELS[o.status]}</span>
+                ${renderSellerAction(o)}
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`}
+
+    <h2 class="font-display text-lg font-extrabold mt-8 mb-3">Completed</h2>
+    ${completed.length===0?`<div class="text-sm text-ink-500">No completed orders yet.</div>`:
+    `<div class="bg-white rounded-2xl border border-ink-200 divide-y divide-ink-100 shadow-card overflow-hidden">
+      ${completed.map(o=>{
+        const p = productById(o.productId);
+        return `<div class="p-3 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-ink-50 overflow-hidden">${productArt(p,80)}</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold truncate">${p.name} × ${o.quantity}</div>
+            <div class="text-xs text-ink-500">${o.id} · ${o.rating?`Rated ${o.rating}★`:'No rating yet'}</div>
+          </div>
+          <div class="font-display font-bold text-sm">${rupee(o.shopPayoutAmount)}</div>
+        </div>`;
+      }).join('')}
+    </div>`}
+  `;
+}
+function renderSellerAction(o){
+  if(o.status==='assigned'){
+    return `<button data-act="start" data-id="${o.id}" class="s-action bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg">Start production →</button>`;
+  }
+  if(o.status==='in_production'){
+    return `<button data-act="ready" data-id="${o.id}" class="s-action bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-lg">Mark as Ready</button>`;
+  }
+  if(o.status==='ready'){
+    return `<button data-act="ofd" data-id="${o.id}" class="s-action bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-3 py-2 rounded-lg">${o.delivery==='pickup'?'Mark Picked Up':'Hand to delivery'}</button>`;
+  }
+  if(o.status==='out_for_delivery'){
+    return `<button data-act="deliver" data-id="${o.id}" class="s-action bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-3 py-2 rounded-lg">Mark Delivered</button>`;
+  }
+  return '';
+}
+function renderSellerProfile(shop){
+  const offerings = [
+    {pid:'vc', label:'Visiting Cards'},
+    {pid:'stk', label:'Stickers'},
+    {pid:'bnr', label:'Banner Printing'},
+    {pid:'flr', label:'Flyers & Brochures'},
+    {pid:'mug', label:'Personalized Mugs'},
+    {pid:'frm', label:'Photo Frames'},
+    {pid:'grt', label:'Greeting Cards'},
+    {pid:'tsh', label:'Custom T-Shirts'},
+  ];
+  // compute current enabled from shop.categories plus any; for this mock, print shops have print ids enabled, gifting have gifting
+  const enabled = new Set();
+  offerings.forEach(o=>{
+    const p = productById(o.pid);
+    if(shop.categories.includes(p.category)) enabled.add(o.pid);
+  });
+  shop._enabled = enabled;
+  return `
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="md:col-span-1 bg-white rounded-2xl border border-ink-200 p-5 shadow-card">
+        <div class="w-20 h-20 rounded-2xl bg-emerald-100 text-emerald-700 grid place-items-center text-3xl mb-3">🏪</div>
+        <div class="font-display text-xl font-extrabold">${shop.name}</div>
+        <div class="text-sm text-ink-500">Owner: ${shop.ownerName}</div>
+        <div class="text-sm text-ink-500 mt-1">${shop.address}</div>
+        <div class="text-sm text-ink-500">${shop.phone}</div>
+        <div class="mt-4 p-3 rounded-xl bg-ink-50 text-sm">
+          <div class="text-xs text-ink-500 mb-1">Average rating</div>
+          <div class="flex items-center gap-1 text-amber-400 text-lg">
+            ${'★'.repeat(Math.round(shop.avgRating||0))}${'☆'.repeat(5-Math.round(shop.avgRating||0))}
+            <span class="text-sm font-bold text-ink-900 ml-1">${shop.avgRating?shop.avgRating.toFixed(1):'New'}</span>
+          </div>
+        </div>
+      </div>
+      <div class="md:col-span-2 bg-white rounded-2xl border border-ink-200 p-5 shadow-card">
+        <h3 class="font-display text-lg font-extrabold mb-1">Capacity & offerings</h3>
+        <p class="text-sm text-ink-500 mb-4">Toggle which products you can fulfil right now. Turn off products when at capacity.</p>
+        <div class="divide-y divide-ink-100">
+          ${offerings.map(o=>{
+            const p = productById(o.pid);
+            const on = enabled.has(o.pid);
+            return `<label class="flex items-center justify-between py-3 cursor-pointer">
+              <div>
+                <div class="font-semibold text-sm">${o.label}</div>
+                <div class="text-xs text-ink-500">${p.category==='print'?'🖨️ Print':'🎁 Gifting'} · from ${rupee(p.basePrice)}/${p.unit}</div>
+              </div>
+              <div class="switch ${on?'on':''}" data-toggle="${o.pid}"></div>
+            </label>`;
+          }).join('')}
+        </div>
+        <div class="mt-4 p-3 rounded-xl bg-brand-50 text-brand-900 text-sm">
+          ℹ️ Keeping your offerings up-to-date helps us route orders to you faster.
+        </div>
+      </div>
+    </div>
+  `;
+}
+function bindSeller(){
+  document.getElementById('s-logout').addEventListener('click', logout);
+  document.querySelectorAll('.s-tab').forEach(t=>t.addEventListener('click',()=>{ SELLER_TAB=t.dataset.tab; render(); }));
+  document.querySelectorAll('.s-action').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const o = STATE.orders.find(x=>x.id===b.dataset.id);
+      if(b.dataset.act==='start') o.status='in_production';
+      if(b.dataset.act==='ready') o.status='ready';
+      if(b.dataset.act==='ofd') o.status='out_for_delivery';
+      if(b.dataset.act==='deliver') o.status='delivered';
+      toast('Order status updated','success');
+      render();
+    });
+  });
+  document.querySelectorAll('.switch[data-toggle]').forEach(sw=>{
+    sw.addEventListener('click', ()=>{
+      sw.classList.toggle('on');
+      toast('Offering updated (mock)','success');
+    });
+  });
+}
+
+/* ============================================================
+   ADMIN PANEL
+============================================================ */
+let ADMIN_TAB = 'shops';
+let ADMIN_FILTERS = { status:'all', shopId:'all', from:'', to:'' };
+function renderAdmin(){
+  return `
+  <div class="min-h-screen flex flex-col md:flex-row bg-ink-50">
+    <!-- Sidebar -->
+    <aside class="md:w-60 bg-white md:border-r border-ink-200 md:min-h-screen md:sticky md:top-0 safe-top">
+      <div class="px-4 py-4 flex items-center gap-2 border-b border-ink-100">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white grid place-items-center font-display font-extrabold text-sm">pz</div>
+        <div>
+          <div class="text-[10px] uppercase tracking-wider font-bold text-indigo-700">Admin</div>
+          <div class="font-display font-extrabold text-ink-900">printez HQ</div>
+        </div>
+      </div>
+      <nav class="p-2 flex md:flex-col gap-1 overflow-x-auto no-scrollbar">
+        ${[
+          ['shops','Shop approvals','🏪'],
+          ['orders','All orders','📦'],
+          ['assign','Manual assignment','🔀'],
+          ['commission','Commission','💰'],
+          ['quality','Shop quality','⭐'],
+        ].map(([id,label,icon])=>`
+          <button data-atab="${id}" class="a-tab flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap ${ADMIN_TAB===id?'bg-indigo-600 text-white':'text-ink-700 hover:bg-ink-100'}">
+            <span>${icon}</span><span>${label}</span>
+            ${id==='shops' && pendingCount()>0?`<span class="ml-auto text-[10px] font-bold bg-red-500 text-white rounded-full px-1.5 py-0.5">${pendingCount()}</span>`:''}
+          </button>
+        `).join('')}
+      </nav>
+      <div class="hidden md:block p-4 mt-auto">
+        <button id="a-logout" class="w-full text-sm bg-ink-100 hover:bg-ink-200 rounded-xl py-2 font-semibold">Switch role</button>
+      </div>
+    </aside>
+
+    <main class="flex-1 p-4 md:p-8 fade-in safe-top">
+      ${renderAdminSection()}
+    </main>
+  </div>`;
+}
+function pendingCount(){ return SHOPS.filter(s=>s.status==='pending').length; }
+function renderAdminSection(){
+  if(ADMIN_TAB==='shops') return renderAdminShops();
+  if(ADMIN_TAB==='orders') return renderAdminOrders();
+  if(ADMIN_TAB==='assign') return renderAdminAssign();
+  if(ADMIN_TAB==='commission') return renderAdminCommission();
+  if(ADMIN_TAB==='quality') return renderAdminQuality();
+  return '';
+}
+
+function renderAdminShops(){
+  const pending = SHOPS.filter(s=>s.status==='pending');
+  const approved = SHOPS.filter(s=>s.status==='approved');
+  const suspended = SHOPS.filter(s=>s.status==='suspended');
+  return `
+    <div>
+      <h1 class="font-display text-2xl font-extrabold mb-1">Shop approvals</h1>
+      <p class="text-sm text-ink-500 mb-6">Review new shop signups from Kharghar. Approve trusted partners to start receiving orders.</p>
+
+      <h2 class="font-display text-lg font-bold mb-3 flex items-center gap-2">Pending <span class="text-xs font-normal text-ink-500">(${pending.length})</span></h2>
+      ${pending.length===0 ? `<div class="bg-white rounded-2xl border border-ink-200 p-8 text-center text-ink-500 mb-8">No pending applications. 🎉</div>` :
+      `<div class="grid md:grid-cols-2 gap-3 mb-8">
+        ${pending.map(s=>`
+          <div class="bg-white rounded-2xl border border-ink-200 p-4 shadow-card">
+            <div class="flex items-start gap-3">
+              <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 grid place-items-center text-xl">🏪</div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-ink-900">${s.name}</div>
+                <div class="text-xs text-ink-500">Owner: ${s.ownerName}</div>
+                <div class="text-xs text-ink-500">${s.address}</div>
+                <div class="mt-1 flex gap-1 flex-wrap">
+                  ${s.categories.map(c=>`<span class="text-[10px] font-bold bg-ink-100 px-2 py-0.5 rounded-full">${c==='print'?'🖨️ Print':'🎁 Gifting'}</span>`).join('')}
+                </div>
+                <div class="text-xs text-ink-500 mt-1">📞 ${s.phone} · Applied ${fmtDate(s.joined)}</div>
+              </div>
+            </div>
+            <div class="mt-3 flex gap-2">
+              <button data-approve="${s.id}" class="a-aprv flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 rounded-lg">Approve</button>
+              <button data-reject="${s.id}" class="a-rej flex-1 bg-white border border-ink-200 hover:border-red-600 hover:text-red-600 text-sm font-bold py-2 rounded-lg">Reject</button>
+            </div>
+          </div>`).join('')}
+      </div>`}
+
+      <h2 class="font-display text-lg font-bold mb-3">Approved shops (${approved.length})</h2>
+      <div class="bg-white rounded-2xl border border-ink-200 overflow-hidden shadow-card">
+        <table class="w-full text-sm">
+          <thead class="bg-ink-50 text-ink-500 text-xs uppercase font-bold">
+            <tr><th class="text-left px-4 py-2.5">Shop</th><th class="text-left px-4 py-2.5 hidden md:table-cell">Categories</th><th class="text-left px-4 py-2.5">Rating</th><th class="text-right px-4 py-2.5">Action</th></tr>
+          </thead>
+          <tbody class="divide-y divide-ink-100">
+            ${approved.map(s=>`<tr>
+              <td class="px-4 py-3">
+                <div class="font-semibold">${s.name}</div>
+                <div class="text-xs text-ink-500">${s.ownerName}</div>
+              </td>
+              <td class="px-4 py-3 hidden md:table-cell">${s.categories.map(c=>c==='print'?'🖨️ Print':'🎁 Gifting').join(' · ')}</td>
+              <td class="px-4 py-3"><span class="${s.avgRating<3.5?'text-red-600 font-bold':''}">${s.avgRating?s.avgRating.toFixed(1)+' ★':'—'}</span></td>
+              <td class="px-4 py-3 text-right">
+                <button data-suspend="${s.id}" class="a-sus text-xs font-semibold text-ink-500 hover:text-red-600">Suspend</button>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function renderAdminOrders(){
+  let orders = [...STATE.orders];
+  if(ADMIN_FILTERS.status!=='all') orders = orders.filter(o=>o.status===ADMIN_FILTERS.status);
+  if(ADMIN_FILTERS.shopId!=='all') orders = orders.filter(o=>o.shopId===ADMIN_FILTERS.shopId);
+  if(ADMIN_FILTERS.from) orders = orders.filter(o=>new Date(o.createdAt) >= new Date(ADMIN_FILTERS.from));
+  if(ADMIN_FILTERS.to)   orders = orders.filter(o=>new Date(o.createdAt) <= new Date(ADMIN_FILTERS.to+'T23:59:59'));
+  const gmv = orders.reduce((s,o)=>s+o.totalAmount,0);
+  const comm = orders.reduce((s,o)=>s+o.commissionAmount,0);
+  return `
+    <h1 class="font-display text-2xl font-extrabold mb-1">All orders</h1>
+    <p class="text-sm text-ink-500 mb-5">Cross-platform view of every order placed on printez.</p>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      <div class="bg-white rounded-2xl border border-ink-200 p-4 shadow-card"><div class="text-xs text-ink-500 font-semibold">Orders</div><div class="font-display text-2xl font-extrabold mt-1">${orders.length}</div></div>
+      <div class="bg-white rounded-2xl border border-ink-200 p-4 shadow-card"><div class="text-xs text-ink-500 font-semibold">GMV</div><div class="font-display text-2xl font-extrabold mt-1">${rupee(gmv)}</div></div>
+      <div class="bg-white rounded-2xl border border-ink-200 p-4 shadow-card"><div class="text-xs text-ink-500 font-semibold">Commission</div><div class="font-display text-2xl font-extrabold mt-1 text-emerald-700">${rupee(comm)}</div></div>
+      <div class="bg-white rounded-2xl border border-ink-200 p-4 shadow-card"><div class="text-xs text-ink-500 font-semibold">Take rate</div><div class="font-display text-2xl font-extrabold mt-1">${gmv?((comm/gmv)*100).toFixed(1):'0'}%</div></div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-ink-200 p-3 mb-4 shadow-card grid grid-cols-2 md:grid-cols-5 gap-2">
+      <select id="f-status" class="bg-ink-50 border border-ink-200 rounded-lg px-2 py-2 text-sm">
+        <option value="all">All statuses</option>
+        ${STATUS_FLOW.map(s=>`<option value="${s}" ${ADMIN_FILTERS.status===s?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}
+      </select>
+      <select id="f-shop" class="bg-ink-50 border border-ink-200 rounded-lg px-2 py-2 text-sm">
+        <option value="all">All shops</option>
+        ${SHOPS.filter(s=>s.status==='approved').map(s=>`<option value="${s.id}" ${ADMIN_FILTERS.shopId===s.id?'selected':''}>${s.name}</option>`).join('')}
+        <option value="none" ${ADMIN_FILTERS.shopId==='none'?'selected':''}>Unassigned</option>
+      </select>
+      <input id="f-from" type="date" value="${ADMIN_FILTERS.from}" class="bg-ink-50 border border-ink-200 rounded-lg px-2 py-2 text-sm" placeholder="From"/>
+      <input id="f-to" type="date" value="${ADMIN_FILTERS.to}" class="bg-ink-50 border border-ink-200 rounded-lg px-2 py-2 text-sm" placeholder="To"/>
+      <button id="f-clear" class="bg-ink-100 hover:bg-ink-200 rounded-lg px-3 py-2 text-sm font-semibold">Clear</button>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-ink-200 overflow-hidden shadow-card overflow-x-auto">
+      <table class="w-full text-sm min-w-[800px]">
+        <thead class="bg-ink-50 text-ink-500 text-xs uppercase font-bold">
+          <tr>
+            <th class="text-left px-4 py-2.5">Order</th>
+            <th class="text-left px-4 py-2.5">Customer</th>
+            <th class="text-left px-4 py-2.5">Product</th>
+            <th class="text-left px-4 py-2.5">Shop</th>
+            <th class="text-left px-4 py-2.5">Status</th>
+            <th class="text-right px-4 py-2.5">Total</th>
+            <th class="text-right px-4 py-2.5">Comm.</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-ink-100">
+          ${orders.length===0?`<tr><td colspan="7" class="px-4 py-8 text-center text-ink-500">No orders match these filters.</td></tr>`:
+          orders.map(o=>{
+            const p = productById(o.productId);
+            const s = shopById(o.shopId);
+            return `<tr class="hover:bg-ink-50">
+              <td class="px-4 py-3 font-mono text-xs">${o.id}<div class="text-[10px] text-ink-500">${fmtDate(o.createdAt)}</div></td>
+              <td class="px-4 py-3">${o.customerName}</td>
+              <td class="px-4 py-3">${p.name} × ${o.quantity}<div class="text-[10px] text-ink-500">${Object.values(o.specs).filter(Boolean).join(' · ')}</div></td>
+              <td class="px-4 py-3">${s?s.name:'<span class="text-amber-700 font-semibold">Unassigned</span>'}</td>
+              <td class="px-4 py-3"><span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${statusColor(o.status)}">${STATUS_LABELS[o.status]}</span></td>
+              <td class="px-4 py-3 text-right font-bold">${rupee(o.totalAmount)}</td>
+              <td class="px-4 py-3 text-right text-emerald-700 font-semibold">${rupee(o.commissionAmount)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderAdminAssign(){
+  const unassigned = STATE.orders.filter(o=>o.status==='placed' && !o.shopId);
+  return `
+    <h1 class="font-display text-2xl font-extrabold mb-1">Manual order assignment</h1>
+    <p class="text-sm text-ink-500 mb-5">Route unassigned orders to eligible shops manually. Eligible = approved shops offering that product category.</p>
+
+    ${unassigned.length===0?`<div class="bg-white rounded-2xl border border-ink-200 p-8 text-center text-ink-500">🎯 All orders are assigned. Nothing to do here.</div>`:
+    `<div class="space-y-3">
+      ${unassigned.map(o=>{
+        const p = productById(o.productId);
+        const eligible = SHOPS.filter(s=>s.status==='approved' && s.categories.includes(p.category));
+        return `<div class="bg-white rounded-2xl border border-ink-200 p-4 shadow-card">
+          <div class="flex items-start gap-3">
+            <div class="w-14 h-14 rounded-xl bg-ink-50 overflow-hidden shrink-0">${productArt(p,120)}</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold">${p.name} × ${o.quantity}</div>
+              <div class="text-xs text-ink-500">${o.id} · ${o.customerName} · ${fmtDate(o.createdAt)}</div>
+              <div class="text-xs text-ink-700 mt-1 truncate">${Object.values(o.specs).filter(Boolean).join(' · ')}</div>
+              <div class="mt-3">
+                <select data-assign="${o.id}" class="assign-sel bg-ink-50 border border-ink-200 rounded-lg px-3 py-2 text-sm w-full md:w-auto">
+                  <option value="">-- Choose a shop --</option>
+                  ${eligible.map(s=>`<option value="${s.id}">${s.name} · ${s.avgRating?`${s.avgRating.toFixed(1)}★`:'New'}</option>`).join('')}
+                </select>
+                <button data-assign-go="${o.id}" class="assign-go ml-0 md:ml-2 mt-2 md:mt-0 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-lg">Assign →</button>
+              </div>
+            </div>
+            <div class="text-right"><div class="font-display font-extrabold">${rupee(o.totalAmount)}</div></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`}
+  `;
+}
+
+function renderAdminCommission(){
+  const today = new Date();
+  const monthAgo = new Date(today); monthAgo.setDate(monthAgo.getDate()-30);
+  const from = ADMIN_FILTERS.from || monthAgo.toISOString().slice(0,10);
+  const to = ADMIN_FILTERS.to || today.toISOString().slice(0,10);
+  const inRange = STATE.orders.filter(o=>{
+    const d = new Date(o.createdAt);
+    return d>=new Date(from) && d<=new Date(to+'T23:59:59');
+  });
+  const totalComm = inRange.reduce((s,o)=>s+o.commissionAmount,0);
+  const totalGmv = inRange.reduce((s,o)=>s+o.totalAmount,0);
+  const printComm = inRange.filter(o=>productById(o.productId).category==='print').reduce((s,o)=>s+o.commissionAmount,0);
+  const giftComm  = inRange.filter(o=>productById(o.productId).category==='gifting').reduce((s,o)=>s+o.commissionAmount,0);
+
+  // breakdown per shop
+  const byShop = {};
+  inRange.filter(o=>o.shopId).forEach(o=>{
+    byShop[o.shopId] = byShop[o.shopId]||{orders:0,gmv:0,comm:0,payout:0};
+    byShop[o.shopId].orders++;
+    byShop[o.shopId].gmv+=o.totalAmount;
+    byShop[o.shopId].comm+=o.commissionAmount;
+    byShop[o.shopId].payout+=o.shopPayoutAmount;
+  });
+  const rows = Object.entries(byShop).map(([sid,v])=>({shop:shopById(sid), ...v})).sort((a,b)=>b.comm-a.comm);
+
+  return `
+    <h1 class="font-display text-2xl font-extrabold mb-1">Commission dashboard</h1>
+    <p class="text-sm text-ink-500 mb-5">Print: <b>15%</b> · Gifting: <b>25%</b> platform fee on every order.</p>
+
+    <div class="bg-white rounded-2xl border border-ink-200 p-3 mb-5 shadow-card grid grid-cols-2 md:grid-cols-4 gap-2">
+      <input type="date" id="c-from" value="${from}" class="bg-ink-50 border border-ink-200 rounded-lg px-2 py-2 text-sm"/>
+      <input type="date" id="c-to" value="${to}" class="bg-ink-50 border border-ink-200 rounded-lg px-2 py-2 text-sm"/>
+      <button id="c-apply" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg px-3 py-2">Apply</button>
+      <div class="text-xs text-ink-500 flex items-center gap-1 md:justify-end">Last 30 days shown by default</div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div class="bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-2xl p-4 shadow-pop">
+        <div class="text-xs font-semibold text-indigo-100">Total commission</div>
+        <div class="font-display text-2xl font-extrabold mt-1">${rupee(totalComm)}</div>
+      </div>
+      <div class="bg-white rounded-2xl border border-ink-200 p-4 shadow-card">
+        <div class="text-xs text-ink-500 font-semibold">GMV in range</div>
+        <div class="font-display text-2xl font-extrabold mt-1">${rupee(totalGmv)}</div>
+      </div>
+      <div class="bg-white rounded-2xl border border-ink-200 p-4 shadow-card">
+        <div class="text-xs text-ink-500 font-semibold">🖨️ Print comm. (15%)</div>
+        <div class="font-display text-2xl font-extrabold mt-1">${rupee(printComm)}</div>
+      </div>
+      <div class="bg-white rounded-2xl border border-ink-200 p-4 shadow-card">
+        <div class="text-xs text-ink-500 font-semibold">🎁 Gifting comm. (25%)</div>
+        <div class="font-display text-2xl font-extrabold mt-1">${rupee(giftComm)}</div>
+      </div>
+    </div>
+
+    <h2 class="font-display text-lg font-bold mb-3">By shop</h2>
+    <div class="bg-white rounded-2xl border border-ink-200 overflow-hidden shadow-card overflow-x-auto">
+      <table class="w-full text-sm min-w-[600px]">
+        <thead class="bg-ink-50 text-ink-500 text-xs uppercase font-bold">
+          <tr><th class="text-left px-4 py-2.5">Shop</th><th class="text-right px-4 py-2.5">Orders</th><th class="text-right px-4 py-2.5">GMV</th><th class="text-right px-4 py-2.5">Payout</th><th class="text-right px-4 py-2.5">Commission</th></tr>
+        </thead>
+        <tbody class="divide-y divide-ink-100">
+          ${rows.length===0?`<tr><td colspan="5" class="px-4 py-6 text-center text-ink-500">No data in range.</td></tr>`:
+          rows.map(r=>`<tr>
+            <td class="px-4 py-3 font-semibold">${r.shop.name}</td>
+            <td class="px-4 py-3 text-right">${r.orders}</td>
+            <td class="px-4 py-3 text-right">${rupee(r.gmv)}</td>
+            <td class="px-4 py-3 text-right">${rupee(r.payout)}</td>
+            <td class="px-4 py-3 text-right text-emerald-700 font-bold">${rupee(r.comm)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderAdminQuality(){
+  const approved = SHOPS.filter(s=>s.status==='approved').map(s=>{
+    const ratings = STATE.orders.filter(o=>o.shopId===s.id && o.rating!=null).map(o=>o.rating);
+    const avg = ratings.length? ratings.reduce((a,b)=>a+b,0)/ratings.length : null;
+    s.avgRating = avg;
+    return {...s, ratingsCount:ratings.length};
+  }).sort((a,b)=> (a.avgRating||0)-(b.avgRating||0));
+  return `
+    <h1 class="font-display text-2xl font-extrabold mb-1">Shop quality</h1>
+    <p class="text-sm text-ink-500 mb-5">Monitor customer ratings. Shops below <b>3.5★</b> are flagged and may need training or suspension.</p>
+
+    <div class="grid md:grid-cols-2 gap-3">
+      ${approved.map(s=>{
+        const flagged = s.avgRating!=null && s.avgRating<3.5;
+        return `<div class="bg-white rounded-2xl border ${flagged?'border-red-300 ring-2 ring-red-100':'border-ink-200'} p-4 shadow-card relative overflow-hidden">
+          ${flagged?`<div class="absolute top-3 right-3 bg-red-100 text-red-700 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">⚠ Flagged</div>`:''}
+          <div class="flex items-start gap-3">
+            <div class="w-12 h-12 rounded-xl ${flagged?'bg-red-100 text-red-700':'bg-emerald-100 text-emerald-700'} grid place-items-center text-xl">🏪</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-bold text-ink-900">${s.name}</div>
+              <div class="text-xs text-ink-500">${s.categories.map(c=>c==='print'?'🖨️ Print':'🎁 Gifting').join(' · ')}</div>
+              <div class="mt-2 flex items-center gap-1 text-2xl ${flagged?'text-red-500':'text-amber-400'}">
+                ${[1,2,3,4,5].map(n=>`<span>${(s.avgRating||0)>=n?'★':(s.avgRating||0)>=n-0.5?'☆':'☆'}</span>`).join('')}
+                <span class="text-sm font-bold text-ink-900 ml-2">${s.avgRating?s.avgRating.toFixed(1):'—'}</span>
+              </div>
+              <div class="text-xs text-ink-500 mt-1">${s.ratingsCount} rating${s.ratingsCount===1?'':'s'}</div>
+              ${flagged?`<div class="mt-3 p-2 rounded-lg bg-red-50 text-red-800 text-xs">
+                Customer satisfaction dropped below threshold. Consider pausing new orders and reaching out.
+              </div>`:''}
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function bindAdmin(){
+  document.querySelectorAll('.a-tab').forEach(t=>t.addEventListener('click',()=>{ ADMIN_TAB=t.dataset.atab; render(); }));
+  const lo = document.getElementById('a-logout'); if(lo) lo.addEventListener('click',logout);
+  document.querySelectorAll('.a-aprv').forEach(b=>b.addEventListener('click',()=>{
+    const s = shopById(b.dataset.approve); s.status='approved'; toast(`${s.name} approved`,'success'); render();
+  }));
+  document.querySelectorAll('.a-rej').forEach(b=>b.addEventListener('click',()=>{
+    const s = shopById(b.dataset.reject); s.status='suspended'; toast(`${s.name} rejected`,'error'); render();
+  }));
+  document.querySelectorAll('.a-sus').forEach(b=>b.addEventListener('click',()=>{
+    const s = shopById(b.dataset.suspend); s.status='suspended'; toast(`${s.name} suspended`,'error'); render();
+  }));
+
+  // orders filters
+  const fs = document.getElementById('f-status'); if(fs) fs.addEventListener('change',e=>{ ADMIN_FILTERS.status=e.target.value; render();});
+  const fsh = document.getElementById('f-shop'); if(fsh) fsh.addEventListener('change',e=>{ ADMIN_FILTERS.shopId=e.target.value; render();});
+  const ff = document.getElementById('f-from'); if(ff) ff.addEventListener('change',e=>{ ADMIN_FILTERS.from=e.target.value; render();});
+  const ft = document.getElementById('f-to'); if(ft) ft.addEventListener('change',e=>{ ADMIN_FILTERS.to=e.target.value; render();});
+  const fc = document.getElementById('f-clear'); if(fc) fc.addEventListener('click',()=>{ ADMIN_FILTERS={status:'all',shopId:'all',from:'',to:''}; render();});
+
+  // assign
+  document.querySelectorAll('.assign-go').forEach(b=>b.addEventListener('click',()=>{
+    const id = b.dataset.assignGo;
+    const sel = document.querySelector(`select[data-assign="${id}"]`);
+    const sid = sel.value;
+    if(!sid){ toast('Pick a shop first','error'); return; }
+    const o = STATE.orders.find(x=>x.id===id);
+    o.shopId = sid; o.status='assigned';
+    toast(`Assigned to ${shopById(sid).name}`,'success');
+    render();
+  }));
+
+  // commission date range
+  const cApply = document.getElementById('c-apply');
+  if(cApply) cApply.addEventListener('click',()=>{
+    ADMIN_FILTERS.from = document.getElementById('c-from').value;
+    ADMIN_FILTERS.to   = document.getElementById('c-to').value;
+    render();
+  });
+}
+
+/* ============================================================
+   TIME ADVANCE (prototype nicety) — auto-progress a random active order on each new session load
+============================================================ */
+(function seedProgress(){
+  // nothing persistent; just ensure variety
+})();
+
+// Kickoff
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Seller · Add product</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+</head>
+<body>
+<div class="shell">
+  <div id="sidebar"></div>
+  <main class="main">
+    <button id="mobile-toggle" class="btn btn-outline mobile-toggle" style="margin-bottom:10px">☰ Menu</button>
+    <div class="container-med" style="padding:0;max-width:640px;margin:0">
+      <a href="products.html" class="text-sm muted" style="display:inline-flex;gap:4px;align-items:center">← Back to products</a>
+      <h1 style="font-size:24px;font-weight:800;margin:8px 0 4px">Add a product</h1>
+      <p class="muted text-sm mb-16">Sell something already on printez, or create a brand new product for the catalog.</p>
+
+      <div class="card card-pad">
+        <div class="field">
+          <label>Add from catalog</label>
+          <select id="existing" class="select"><option value="">— Pick a product —</option>
+            ${Data.products().map(p=>`<option value="${p.id}">${p.name} (${p.category})</option>`).join('')}
+          </select>
+          <div class="hint">Or fill in the form below to add a brand-new product.</div>
+        </div>
+        <hr class="sep">
+        <div class="field"><label>Product name</label><input id="p-name" class="input" placeholder="e.g. Vinyl Glow Stickers"/></div>
+        <div class="input-row">
+          <div class="field" style="margin:0"><label>Category</label>
+            <select id="p-cat" class="select"><option value="print">🖨️ Print</option><option value="gifting">🎁 Gifting</option></select>
+          </div>
+          <div class="field" style="margin:0"><label>Unit</label>
+            <select id="p-unit" class="select"><option value="pc">per piece</option><option value="sq.ft">per sq.ft</option><option value="set">per set</option></select>
+          </div>
+        </div>
+        <div class="field"><label>Tagline</label><input id="p-tag" class="input" placeholder="Short description shown on card"/></div>
+        <div class="field"><label>Starting price (₹)</label><input id="p-price" type="number" min="1" class="input" placeholder="e.g. 299"/></div>
+        <div class="input-row">
+          <div class="field" style="margin:0"><label>Lead time (hrs)</label><input id="p-lead" type="number" min="1" class="input" value="24"/></div>
+          <div class="field" style="margin:0"><label>Delivery fee (₹)</label><input id="p-fee" type="number" min="0" class="input" value="39"/></div>
+        </div>
+        <div class="field" id="print-fields">
+          <label>Quick bulk tiers (optional)</label>
+          <div class="text-xs muted" style="margin-bottom:6px">Comma-separated qty:price pairs (e.g. <span class="kbd">50:10,100:7,500:5</span>)</div>
+          <input id="p-tiers" class="input" placeholder="50:10,100:7,500:5"/>
+        </div>
+        <button id="save" class="btn btn-primary btn-block btn-lg" style="background:#059669">Add product to my shop</button>
+      </div>
+      <div style="height:40px"></div>
+    </div>
+  </main>
+</div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+if(!requireAuth('seller')){} else bind();
+
+function bind(){
+  document.getElementById('sidebar').innerHTML = renderSellerSidebar('add-product');
+  bindSellerShell();
+  document.getElementById('p-cat').addEventListener('change', e=>{
+    document.getElementById('print-fields').style.display = e.target.value==='print'?'block':'none';
+  });
+  document.getElementById('existing').addEventListener('change', e=>{
+    const pid=e.target.value; if(!pid) return;
+    const p=Data.productById(pid);
+    document.getElementById('p-name').value=p.name;
+    document.getElementById('p-cat').value=p.category;
+    document.getElementById('p-unit').value=p.unit;
+    document.getElementById('p-tag').value=p.tagline;
+    document.getElementById('p-price').value=computeStartingPrice(p,{baseAdj:0});
+    document.getElementById('print-fields').style.display=p.category==='print'?'block':'none';
+    if(p.tiers) document.getElementById('p-tiers').value=p.tiers.map(t=>t[0]+':'+t[1]).join(',');
+  });
+  document.getElementById('save').addEventListener('click',()=>{
+    const name=document.getElementById('p-name').value.trim();
+    const cat=document.getElementById('p-cat').value;
+    const unit=document.getElementById('p-unit').value;
+    const tag=document.getElementById('p-tag').value.trim();
+    const price=parseFloat(document.getElementById('p-price').value);
+    const lead=parseInt(document.getElementById('p-lead').value)||24;
+    const fee=parseInt(document.getElementById('p-fee').value)||0;
+    const tiersRaw=document.getElementById('p-tiers').value.trim();
+    if(!name||!price){ toast('Fill in name and starting price','error'); return; }
+    const shops=Data.shops();
+    const shop=shops.find(s=>s.id===Auth.seller().shopId);
+    // determine if product exists or create new
+    const existing=document.getElementById('existing').value;
+    let p;
+    if(existing){
+      p = Data.productById(existing);
+    } else {
+      // create new product
+      const id = 'prod_'+Math.random().toString(36).slice(2,8);
+      let tiers=null;
+      if(cat==='print' && tiersRaw){
+        tiers = tiersRaw.split(',').map(pair=>{ const [a,b]=pair.split(':').map(s=>s.trim()); return [parseInt(a), parseFloat(b)]; }).filter(x=>x[0]&&x[1]);
+      }
+      p = { id, name, category:cat, unit, tagline:tag, art:cat==='print'?'flyer':'greet', materials:cat==='print'?[{label:'Standard',mult:1}]:[],
+            hasSides:false, customSize:false, sizes:[], basePrice:price, tiers:tiers||[[1,price]], gifting:cat==='gifting',
+            giftOpts:cat==='gifting'?[{name:'Standard',price}]:[], platformOwned:false, _listingMap:{}, listings:[]};
+      const prods = Data.products(); prods.push(p); Data.saveProducts(prods);
+    }
+    // attach listing
+    const lid = uid('lst');
+    const listing = { id:lid, shopId:shop.id, productId:p.id, active:true, leadTimeHours:lead, deliveryFee:fee, tierOverrides:null, baseAdj:price-computeStartingPrice(p,{baseAdj:0}) };
+    p._listingMap = p._listingMap||{}; p._listingMap[lid]=listing;
+    p.listings = p.listings||[]; p.listings.push(lid);
+    if(!shop.listings.includes(lid)) shop.listings.push(lid);
+    if(!shop.categories.includes(cat)) shop.categories.push(cat);
+    Data.saveProducts(Data.products()); Data.saveShops(shops);
+    toast(name+' added to your shop','success');
+    setTimeout(()=>location.href='products.html',500);
+  });
+}
+</script>
+</body>
+</html>

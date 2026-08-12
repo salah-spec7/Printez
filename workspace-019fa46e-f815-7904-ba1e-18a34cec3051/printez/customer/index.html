@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Shop print & gifting in Kharghar</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><meta name="theme-color" content="#c2410c"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c2410c'/%3E%3Ctext x='16' y='22' font-family='Inter' font-size='18' font-weight='800' text-anchor='middle' fill='white'%3Epz%3C/text%3E%3C/svg%3E"/>
+</head>
+<body>
+<div id="app"></div>
+<div id="nav"></div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+window.isHome = true;
+
+let activeSub = 'all'; // 'all' | 'print' | 'gifting'
+let searchQ = '';
+
+function productsFor(cat){
+  const q = searchQ.trim().toLowerCase();
+  return Data.products().filter(p=>{
+    if(p.category!==cat) return false;
+    if(!q) return true;
+    return (p.name+' '+p.tagline+' '+p.id).toLowerCase().includes(q);
+  });
+}
+
+function renderSection(cat, title){
+  if(activeSub!=='all' && activeSub!==cat) return '';
+  const prods = productsFor(cat);
+  return `
+    <h2 class="section-title">${title}<span class="sub">${prods.length} item${prods.length===1?'':'s'}</span></h2>
+    ${prods.length===0 ? `<div class="empty" style="padding:28px 12px"><div class="ic">🔍</div><p class="muted text-sm">No products match "${searchQ}" in this category.</p></div>` :
+    `<div class="grid-products">
+      ${prods.map(p=>{
+        const cheap = Data.cheapestListing(p.id);
+        const price = cheap?cheap.price:p.basePrice;
+        const cheapestShop = cheap?Data.shopById(cheap.l.shopId):null;
+        const numListings = Data.activeListingsForProduct(p.id).length;
+        return `<a href="product.html?id=${p.id}" class="pcard">
+          <div class="pcard-img">${productArt(p,280)}</div>
+          <div class="pcard-body">
+            <div class="pcard-name">${p.name}</div>
+            <div class="pcard-sub">${p.tagline}</div>
+            ${cheapestShop?`<div class="pcard-shop">from ${cheapestShop.name} · ${numListings} shop${numListings>1?'s':''} nearby</div>`:''}
+            <div class="pcard-row">
+              <div class="pcard-price">
+                <div class="from">${p.gifting?'from':`from · ${startingPriceTierQty(p)}${p.unit==='sq.ft'?' sq.ft+' : '+'}`}</div>
+                <div><span class="val">${inr(price)}</span><span class="unit">/${p.unit}</span></div>
+              </div>
+              <div class="pcard-cta">Configure →</div>
+            </div>
+          </div>
+        </a>`;
+      }).join('')}
+    </div>`}
+  `;
+}
+
+function render(){
+  const approved = Data.shops().filter(s=>s.status==='approved').length;
+  const totalProds = Data.products().length;
+  document.getElementById('app').innerHTML = `
+    ${renderTopbarCustomer()}
+    <main class="container">
+      <section class="hero">
+        <div class="hero-chips"><span>🇮🇳 Kharghar · Same-day</span></div>
+        <h1>Print it. Gift it.<br/>Next door.</h1>
+        <p>Visiting cards, stickers, banners & personalised gifts — made by local Kharghar shops.</p>
+        <div class="hero-chips"><span>⚡ Ready in hours</span><span>🚲 Hyperlocal delivery</span><span>💸 Fair local pricing</span></div>
+        <div class="hero-deco"></div>
+      </section>
+
+      <div class="flex no-scrollbar" style="gap:8px;overflow-x:auto;padding:16px 0 6px">
+        ${['all','print','gifting'].map(c=>`
+          <button data-cat="${c}" class="chip ${activeSub===c?'active':''}">${c==='all'?'✨ All':c==='print'?'🖨️  Print':'🎁  Gifting'}</button>
+        `).join('')}
+      </div>
+
+      ${renderSection('print','🖨️ Print services')}
+      ${renderSection('gifting','🎁 Personalised gifting')}
+
+      <section class="grid-stats mt-24">
+        <div class="card card-pad"><div class="text-xs muted font-bold">🏪 Local shops</div><div class="font-display font-extrabold" style="font-size:22px;margin-top:4px">${approved}</div></div>
+        <div class="card card-pad"><div class="text-xs muted font-bold">⚡ Avg. turnaround</div><div class="font-display font-extrabold" style="font-size:22px;margin-top:4px">6 hrs</div></div>
+        <div class="card card-pad"><div class="text-xs muted font-bold">⭐ Average rating</div><div class="font-display font-extrabold" style="font-size:22px;margin-top:4px">4.4★</div></div>
+        <div class="card card-pad"><div class="text-xs muted font-bold">🚲 Delivery radius</div><div class="font-display font-extrabold" style="font-size:22px;margin-top:4px">5 km</div></div>
+      </section>
+
+      <div class="mobile-spacer"></div>
+    </main>`;
+  document.getElementById('nav').innerHTML = renderBottomNavCustomer('home');
+  bindCustomerShell();
+  bind();
+}
+
+function bind(){
+  document.querySelectorAll('[data-cat]').forEach(b=>{
+    b.addEventListener('click',()=>{ activeSub=b.dataset.cat; render(); });
+  });
+  const s = document.getElementById('top-search');
+  if(s){
+    s.value = searchQ;
+    s.focus({preventScroll:true});
+    // Keep cursor at end
+    const v=s.value; s.value=''; s.value=v;
+    s.addEventListener('input',()=>{
+      searchQ = s.value;
+      // Cheaper partial re-render: rebuild inner HTML of container
+      const main = document.querySelector('main.container');
+      // We do a full render to keep it simple; the input is rebuilt so we need to re-focus.
+      // To keep typing smooth, re-render on a debounce.
+      clearTimeout(window._sdt);
+      window._sdt = setTimeout(()=>{
+        const scrollY = window.scrollY;
+        render();
+        window.scrollTo(0, scrollY);
+        const ns = document.getElementById('top-search');
+        if(ns){ ns.focus(); ns.setSelectionRange(ns.value.length, ns.value.length); }
+      },120);
+    });
+  }
+}
+
+render();
+</script>
+</body>
+</html>

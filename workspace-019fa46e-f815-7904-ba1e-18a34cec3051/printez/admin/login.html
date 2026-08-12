@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Admin · Sign in</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+</head>
+<body class="auth-wrap">
+<div class="container-slim" style="padding-top:24px">
+  <a href="../index.html" class="brand" style="margin-bottom:22px;display:inline-flex"><div class="brand-logo" style="background:#4f46e5">A</div>Admin HQ</a>
+  <div class="auth-card">
+    <h1>Platform admin</h1>
+    <p class="lead">Internal tool for printez ops team.</p>
+    <div id="msg"></div>
+    <form id="f">
+      <div class="field"><label>Email</label><input id="email" class="input" placeholder="admin@printez.app" value="admin@printez.app"/></div>
+      <div class="field"><label>Password</label><input id="pw" type="password" class="input" placeholder="••••••••" value="admin123"/></div>
+      <button class="btn btn-primary btn-block btn-lg" style="background:#4f46e5" type="submit">Sign in</button>
+    </form>
+    <div class="muted text-xs text-center mt-16">Demo credentials are prefilled. Use any email/password to sign in.</div>
+  </div>
+</div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+document.getElementById('f').addEventListener('submit',e=>{
+  e.preventDefault();
+  const email=document.getElementById('email').value || 'admin@printez.app';
+  Auth.setAdmin({email, name:'Admin', loginAt:now()});
+  toast('Signed in','success');
+  setTimeout(()=>location.href='dashboard.html',400);
+});
+</script>
+</body>
+</html>

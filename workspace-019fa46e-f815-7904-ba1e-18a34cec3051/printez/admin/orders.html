@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Admin · All orders</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+</head>
+<body><div class="shell"><div id="sidebar"></div><main class="main">
+  <button id="mobile-toggle" class="btn btn-outline mobile-toggle" style="margin-bottom:10px">☰ Menu</button>
+  <div id="content"></div>
+</main></div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+if(!requireAuth('admin')){} else render();
+let flt = { status:'all', shopId:'all', from:'', to:'' };
+function render(){
+  document.getElementById('sidebar').innerHTML = renderAdminSidebar('orders');
+  bindAdminShell();
+  let orders = Data.orders();
+  if(flt.status!=='all') orders = orders.filter(o=>o.status===flt.status);
+  if(flt.shopId==='none') orders = orders.filter(o=>!o.shopId);
+  else if(flt.shopId!=='all') orders = orders.filter(o=>o.shopId===flt.shopId);
+  if(flt.from) orders = orders.filter(o=>new Date(o.createdAt)>=new Date(flt.from));
+  if(flt.to)   orders = orders.filter(o=>new Date(o.createdAt)<=new Date(flt.to+'T23:59:59'));
+  const gmv=orders.reduce((s,o)=>s+o.totalAmount,0), comm=orders.reduce((s,o)=>s+o.commissionAmount,0);
+
+  document.getElementById('content').innerHTML = `
+    <h1 style="font-size:24px;font-weight:800">All orders</h1>
+    <p class="muted text-sm mb-16">Cross-platform view — filter, search, and inspect every order.</p>
+
+    <div class="grid-stats mb-16"><div class="stat"><div class="lbl">Orders</div><div class="val">${orders.length}</div></div>
+      <div class="stat"><div class="lbl">GMV</div><div class="val">${inr(gmv)}</div></div>
+      <div class="stat"><div class="lbl">Commission</div><div class="val" style="color:#059669">${inr(comm)}</div></div>
+      <div class="stat"><div class="lbl">Take rate</div><div class="val">${gmv?((comm/gmv)*100).toFixed(1):'0'}%</div></div></div>
+
+    <div class="card card-pad mb-16" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+      <select id="f-status" class="select"><option value="all">All statuses</option>${STATUS_FLOW.map(s=>`<option value="${s}" ${flt.status===s?'selected':''}>${STATUS_LABEL[s]}</option>`).join('')}</select>
+      <select id="f-shop" class="select"><option value="all">All shops</option><option value="none" ${flt.shopId==='none'?'selected':''}>Unassigned</option>${Data.shops().filter(s=>s.status==='approved').map(s=>`<option value="${s.id}" ${flt.shopId===s.id?'selected':''}>${s.name}</option>`).join('')}</select>
+      <input id="f-from" type="date" class="input" value="${flt.from}"/>
+      <input id="f-to" type="date" class="input" value="${flt.to}"/>
+      <button id="f-clear" class="btn btn-outline">Clear</button>
+    </div>
+
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Order</th><th>Customer</th><th>Product</th><th>Shop</th><th>Status</th><th>Date</th><th style="text-align:right">Total</th><th style="text-align:right">Comm.</th></tr></thead>
+      <tbody>${orders.length===0?`<tr><td colspan="8" class="text-center muted" style="padding:40px">No orders match.</td></tr>`:orders.map(o=>{
+        const p=Data.productById(o.productId),sh=Data.shopById(o.shopId);
+        return `<tr><td class="font-mono text-xs">${o.id}</td><td>${o.customerName}<div class="text-xs muted">${o.customerPhone}</div></td>
+          <td>${p.name} × ${o.quantity}<div class="text-xs muted">${Object.values(o.specs).filter(Boolean).join(' · ')}</div></td>
+          <td>${sh?sh.name:'<span style="color:#b91c1c;font-weight:700">Unassigned</span>'}</td>
+          <td><span class="badge ${STATUS_BADGE[o.status]}">${STATUS_LABEL[o.status]}</span></td>
+          <td class="text-xs muted">${fmtDateShort(o.createdAt)}</td>
+          <td style="text-align:right;font-weight:700">${inr(o.totalAmount)}</td>
+          <td style="text-align:right;color:#059669;font-weight:600">${inr(o.commissionAmount)}</td></tr>`;
+      }).join('')}</tbody></table></div>
+    <div style="height:40px"></div>`;
+
+  document.getElementById('f-status').addEventListener('change',e=>{flt.status=e.target.value;render();});
+  document.getElementById('f-shop').addEventListener('change',e=>{flt.shopId=e.target.value;render();});
+  document.getElementById('f-from').addEventListener('change',e=>{flt.from=e.target.value;render();});
+  document.getElementById('f-to').addEventListener('change',e=>{flt.to=e.target.value;render();});
+  document.getElementById('f-clear').addEventListener('click',()=>{flt={status:'all',shopId:'all',from:'',to:''};render();});
+}
+</script>
+</body>
+</html>

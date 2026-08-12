@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Your orders</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><meta name="theme-color" content="#c2410c"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c2410c'/%3E%3Ctext x='16' y='22' font-family='Inter' font-size='18' font-weight='800' text-anchor='middle' fill='white'%3Epz%3C/text%3E%3C/svg%3E"/>
+</head>
+<body>
+<div id="app"></div><div id="nav"></div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+const params = new URLSearchParams(location.search);
+const hl = params.get('highlight');
+const detailId = params.get('id');
+const cust = Auth.customer();
+
+function render(){
+  if(!cust){
+    document.getElementById('app').innerHTML = `${renderTopbarCustomer()}<main class="container"><div class="empty" style="padding-top:60px"><div class="ic">🔐</div><h3>Sign in to see orders</h3><a href="login.html" class="btn btn-primary">Sign in</a></div></main>`;
+    document.getElementById('nav').innerHTML=renderBottomNavCustomer('orders'); bindCustomerShell(); return;
+  }
+  // For prototype, show all orders where customerPhone matches (since sample orders predate auth) OR customerId matches
+  const all = Data.orders();
+  const mine = all.filter(o=>o.customerId===cust.id || o.customerPhone===cust.phone);
+
+  if(detailId){
+    const order = Data.orderById(detailId);
+    if(!order){ location.href='orders.html'; return; }
+    document.getElementById('app').innerHTML = `${renderTopbarCustomer()}<main class="container-med" style="padding-bottom:100px">${renderOrderDetail(order)}</main>`;
+    document.getElementById('nav').innerHTML=renderBottomNavCustomer('orders');
+    bindCustomerShell(); bindDetail(order); return;
+  }
+
+  document.getElementById('app').innerHTML = `
+    ${renderTopbarCustomer()}
+    <main class="container-med">
+      <h1 class="font-display" style="font-size:24px;font-weight:800;margin:16px 0 4px">Your orders</h1>
+      <p class="muted text-sm" style="margin-bottom:20px">Track fulfilment from local Kharghar shops.</p>
+      ${hl?`<div class="form-success">✓ Payment successful — your new order is live below.</div>`:''}
+      ${mine.length===0?`<div class="empty"><div class="ic">📦</div><h3>No orders yet</h3><p>Start browsing to place your first order.</p><a href="index.html" class="btn btn-primary">Browse catalog</a></div>`:
+      `<div style="display:flex;flex-direction:column;gap:10px">${mine.map(o=>{
+        const p=Data.productById(o.productId), sh=Data.shopById(o.shopId);
+        return `<a href="orders.html?id=${o.id}" class="order-mini">
+          <div class="order-mini-img">${productArt(p,110)}</div>
+          <div class="order-mini-body">
+            <div class="n">${p.name} × ${o.quantity}</div>
+            <div class="m">${o.id} · ${fmtDateShort(o.createdAt)}</div>
+            <div style="margin-top:6px"><span class="badge ${STATUS_BADGE[o.status]}">${STATUS_LABEL[o.status]}</span></div>
+          </div>
+          <div class="order-mini-pr">${inr(o.totalAmount)}</div>
+        </a>`;
+      }).join('')}</div>`}
+    </main>`;
+  document.getElementById('nav').innerHTML=renderBottomNavCustomer('orders');
+  bindCustomerShell();
+  // strip ?highlight on nav
+  if(hl){ history.replaceState(null,'','orders.html'); }
+}
+
+function renderOrderDetail(o){
+  const p = Data.productById(o.productId);
+  const sh = Data.shopById(o.shopId);
+  const idx = STATUS_FLOW.indexOf(o.status);
+  return `
+    <a href="orders.html" class="text-sm muted" style="display:inline-flex;align-items:center;gap:4px;margin:12px 0">← All orders</a>
+    <div class="card" style="overflow:hidden">
+      <div class="card-pad" style="display:flex;gap:14px;background:linear-gradient(135deg,#fff7ed,#fff);border-bottom:1px solid var(--ink-100)">
+        <div style="width:84px;height:84px;border-radius:14px;overflow:hidden;background:#fff;flex-shrink:0;border:1px solid var(--ink-200)">${productArt(p,160)}</div>
+        <div style="flex:1;min-width:0">
+          <span class="badge ${p.category==='print'?'badge-print':'badge-gifting'}">${p.category==='print'?'Print':'Gift'}</span>
+          <h2 style="font-size:20px;font-weight:800;margin-top:4px">${p.name}</h2>
+          <div class="text-xs muted">${o.id} · ${fmtDate(o.createdAt)}</div>
+          <div class="text-xs muted" style="margin-top:4px">${Object.values(o.specs).filter(Boolean).join(' · ')}</div>
+        </div>
+        <div style="text-align:right"><div class="text-xs muted">Total</div><div class="font-display font-extrabold" style="color:var(--brand-700);font-size:20px">${inr(o.totalAmount)}</div></div>
+      </div>
+      ${sh?`<div class="card-pad flex flex-gap" style="gap:12px;border-bottom:1px solid var(--ink-100);align-items:center">
+        <div style="width:40px;height:40px;border-radius:50%;background:#d1fae5;color:#065f46;display:grid;place-items:center;font-weight:800;font-size:14px">${(sh.name||'S')[0].toUpperCase()}</div>
+        <div style="flex:1"><div class="text-xs muted">Fulfilled by</div><div style="font-weight:700">${sh.name}</div><div class="text-xs muted">${sh.address}</div></div>
+        <button class="btn btn-ghost btn-sm">Call</button>
+      </div>`:''}
+      <div class="card-pad">
+        <div class="text-xs font-bold uppercase muted" style="letter-spacing:.06em;margin-bottom:14px">Order status</div>
+        <div class="stepper">
+          ${STATUS_FLOW.map((s,i)=>{
+            const done=i<idx, active=i===idx;
+            const ev = (o.timeline||[]).find(t=>t.status===s);
+            return `<div class="step ${done?'done':active?'active':''}">
+              <div class="dot">${done?'✓':i+1}</div>
+              <div class="step-info">
+                <div class="step-title">${STATUS_LABEL[s]}</div>
+                <div class="step-sub">${stepText(s,sh,o)}</div>
+                ${ev?`<div class="step-time">${fmtDate(ev.at)}</div>`:''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="card-pad" style="background:var(--ink-50);border-top:1px solid var(--ink-100)">
+        <div class="text-xs font-bold uppercase muted" style="letter-spacing:.06em;margin-bottom:4px">${o.delivery==='pickup'?'Pickup from shop':'Delivering to'}</div>
+        <div style="font-weight:600">${o.customerName} · ${o.customerPhone}</div>
+        <div class="text-sm muted">${o.address}</div>
+      </div>
+      ${o.status==='delivered' ? renderRate(o) : ''}
+    </div>`;
+}
+function stepText(s,sh,o){
+  switch(s){
+    case 'placed': return 'We received your order and are routing it to a nearby shop.';
+    case 'assigned': return sh?`${sh.name} accepted your order and will start soon.`:'';
+    case 'in_production': return 'The shop is producing your order right now.';
+    case 'ready': return o.delivery==='pickup'?'Ready for pickup — head to the shop.':'Ready and being handed over to a delivery partner.';
+    case 'out_for_delivery': return 'On its way to you now!';
+    case 'delivered': return 'Delivered. We hope you love it!';
+  }
+}
+function renderRate(o){
+  const rated = o.rating!=null;
+  return `<div class="card-pad" style="border-top:1px solid var(--ink-100)" id="rate-box">
+    <div style="font-weight:700">How was your experience?</div>
+    <div class="text-sm muted" style="margin-bottom:10px">Rate ${Data.shopById(o.shopId)?.name||'the shop'} to help us improve Kharghar's local marketplace.</div>
+    <div class="stars stars-lg" id="stars" style="letter-spacing:4px">
+      ${[1,2,3,4,5].map(n=>`<span class="star-btn ${rated && n<=o.rating?'':'empty'}" data-star="${n}">★</span>`).join('')}
+    </div>
+    <textarea id="rate-text" rows="2" placeholder="Optional feedback…" class="textarea mt-8 ${rated?'hidden':''}" style="margin-top:12px">${o.review||''}</textarea>
+    <button id="rate-submit" class="btn btn-primary mt-8 ${rated?'hidden':''}" style="margin-top:12px">Submit rating</button>
+    ${rated?`<div class="text-sm" style="color:var(--good);font-weight:600;margin-top:12px">Thanks for your feedback! 🧡</div>`:''}
+  </div>`;
+}
+function bindDetail(o){
+  const rb=document.getElementById('rate-box');
+  if(rb){
+    let sel = o.rating||0;
+    const stars = rb.querySelectorAll('.star-btn');
+    stars.forEach(s=>s.addEventListener('click',()=>{
+      sel=parseInt(s.dataset.star);
+      stars.forEach(x=>{ const n=parseInt(x.dataset.star); x.classList.toggle('empty',n>sel); });
+    }));
+    const sub = document.getElementById('rate-submit');
+    sub.addEventListener('click',()=>{
+      if(!sel){ toast('Tap a star to rate','error'); return; }
+      const orders=Data.orders();
+      const target = orders.find(x=>x.id===o.id);
+      target.rating=sel;
+      target.review=document.getElementById('rate-text').value.trim();
+      Data.saveOrders(orders);
+      Data.recomputeShopRating(target.shopId);
+      toast('Thanks for rating!','success');
+      setTimeout(()=>render(),400);
+    });
+  }
+}
+
+render();
+</script>
+</body>
+</html>

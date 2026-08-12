@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Admin · Catalog</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+</head>
+<body><div class="shell"><div id="sidebar"></div><main class="main">
+  <button id="mobile-toggle" class="btn btn-outline mobile-toggle" style="margin-bottom:10px">☰ Menu</button>
+  <div id="content"></div>
+</main></div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+if(!requireAuth('admin')){} else render();
+let cat='all';
+function render(){
+  document.getElementById('sidebar').innerHTML = renderAdminSidebar('products');
+  bindAdminShell();
+  let prods = Data.products();
+  if(cat!=='all') prods = prods.filter(p=>p.category===cat);
+  document.getElementById('content').innerHTML = `
+    <h1 style="font-size:24px;font-weight:800">Catalog</h1>
+    <p class="muted text-sm mb-16">Every product across categories and shops. ${Data.products().length} total SKUs.</p>
+    <div class="tabs mb-16" style="margin-bottom:16px">
+      ${[['all','All'],['print','🖨️ Print'],['gifting','🎁 Gifting']].map(([v,l])=>`<button class="tab ${cat===v?'active':''}" data-c="${v}">${l}</button>`).join('')}
+    </div>
+    <div class="grid-products">${prods.map(p=>{
+      const listings = Object.values(p._listingMap||{});
+      const live = listings.filter(l=>l.active && Data.shopById(l.shopId)?.status==='approved');
+      const price = live.length? Math.min(...live.map(l=>computeStartingPrice(p,l))):null;
+      return `<div class="pcard" style="cursor:default">
+        <div class="pcard-img">${productArt(p,280)}</div>
+        <div class="pcard-body">
+          <div class="pcard-name">${p.name}</div>
+          <div class="pcard-sub">${p.tagline}</div>
+          <div style="margin-top:6px"><span class="badge ${p.category==='print'?'badge-print':'badge-gifting'}">${p.category}</span> <span class="badge" style="background:var(--ink-100);color:var(--ink-700)">${live.length} shop${live.length===1?'':'s'}</span></div>
+          <div class="pcard-row" style="margin-top:8px">
+            <div class="pcard-price">${price?`<div class="from">from</div><div><span class="val">${inr(price)}</span><span class="unit">/${p.unit}</span></div>`:'<div class="muted text-xs">No sellers</div>'}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}</div>
+    <div style="height:40px"></div>`;
+  document.querySelectorAll('[data-c]').forEach(b=>b.addEventListener('click',()=>{cat=b.dataset.c;render();}));
+}
+</script>
+</body>
+</html>

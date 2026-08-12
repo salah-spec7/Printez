@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Configure product</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><meta name="theme-color" content="#c2410c"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c2410c'/%3E%3Ctext x='16' y='22' font-family='Inter' font-size='18' font-weight='800' text-anchor='middle' fill='white'%3Epz%3C/text%3E%3C/svg%3E"/>
+</head>
+<body>
+<div id="app"></div>
+<div id="nav"></div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+const params = new URLSearchParams(location.search);
+const productId = params.get('id');
+const product = Data.productById(productId);
+if(!product){ location.href='index.html'; }
+
+// config state
+const state = {
+  materialIdx:0, sides:'single', quantity: product.gifting?1 : (product.id==='banners'?24:100),
+  width: product.id==='banners'?6 : (product.id==='stickers'?3:0),
+  height: product.id==='banners'?4 : (product.id==='stickers'?3:0),
+  sizeIdx:0, giftIdx:0, photoUploaded:false,
+  listingId: null,
+};
+// pick cheapest listing as default
+const cheap = Data.cheapestListing(product.id);
+state.listingId = cheap?cheap.l.id:null;
+
+function listing(){ return Data.listingById(product.id, state.listingId); }
+
+function render(){
+  const list = listing();
+  const price = list ? calcPrice(product, list, state) : null;
+  document.getElementById('app').innerHTML = `
+    ${renderTopbarCustomer()}
+    <main class="container">
+      <a href="index.html" class="text-sm muted" style="display:inline-flex;align-items:center;gap:4px;margin-top:12px">← Back to catalog</a>
+      <div class="grid-2" style="margin-top:12px">
+        <div>
+          <div class="pd-img">${productArt(product,500)}</div>
+          <div class="card card-pad mt-16">
+            <span class="badge ${product.category==='print'?'badge-print':'badge-gifting'}">${product.category==='print'?'🖨️ Print':'🎁 Gifting'}</span>
+            <h1 style="font-size:24px;font-weight:800;margin-top:8px">${product.name}</h1>
+            <p class="muted text-sm">${product.tagline}</p>
+            <div class="divider"></div>
+            <div class="text-sm">${product.category==='print'
+              ? '💡 Bulk pricing — the more you order, the less you pay. Double-sided printing costs extra.'
+              : '🎁 Add a personal touch! Upload your photo for printing; the shop will reach out if they need a better image.'}
+            </div>
+            ${product.category==='print' && product.tiers ? `
+              <div class="divider"></div>
+              <div class="text-xs muted font-bold uppercase" style="letter-spacing:.06em;margin-bottom:8px">Bulk pricing (per ${product.unit})</div>
+              <div class="tiers" id="tiers">
+                ${product.tiers.map(([t,pr],i)=>`<div class="tier"><div class="q">${t}+</div><div class="p">₹${pr}</div></div>`).join('')}
+              </div>`:''}
+          </div>
+        </div>
+
+        <div style="position:relative;display:flex;flex-direction:column;min-height:100%">
+          <div class="space-y" style="display:flex;flex-direction:column;gap:12px;padding-bottom:12px">
+            ${renderShopPicker()}
+            ${product.category==='print'?renderPrintConfig():renderGiftConfig()}
+          </div>
+          <div class="pd-spacer"></div>
+
+          <div class="pd-sticky">
+            <div>
+              <div class="text-xs" style="color:#a8a29e">${price?price.quantity:0} ${product.unit}${price&&price.quantity>1&&product.unit!=='sq.ft'?'s':''}</div>
+              <div class="font-display font-extrabold" style="font-size:22px;line-height:1.1">${price?inr(price.total):'—'}</div>
+              <div class="text-xs" style="color:#a8a29e">${price?inr(price.unitPrice)+' per '+product.unit:''}</div>
+            </div>
+            <button id="add-cart" class="btn btn-primary btn-lg" ${list?'':'disabled'} style="white-space:nowrap;flex-shrink:0">Add to cart</button>
+          </div>
+        </div>
+      </div>
+    </main>`;
+  document.getElementById('nav').innerHTML = renderBottomNavCustomer('home');
+  bindCustomerShell();
+  bind();
+  updatePrice();
+}
+
+function renderShopPicker(){
+  const listings = Data.activeListingsForProduct(product.id);
+  if(!listings.length) return `<div class="card card-pad" style="background:#fef2f2;border-color:#fecaca;color:#991b1b"><b>No shops available.</b> This product isn't offered by any shop in Kharghar right now.</div>`;
+  return `<div class="card card-pad" style="border-color:var(--brand-600);background:var(--brand-50)">
+    <div class="text-xs font-bold uppercase" style="letter-spacing:.06em;margin-bottom:4px;color:var(--brand-700)">🏪 Choose a shop</div>
+    <div class="text-xs muted" style="margin-bottom:10px">Pick who makes your order — compare rating, lead time, and price.</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${listings.map(l=>{
+        const sh = Data.shopById(l.shopId);
+        const unitP = calcPrice(product,l,state).unitPrice;
+        return `<label class="flex flex-gap" style="gap:10px;padding:10px;border:1.5px solid ${state.listingId===l.id?'var(--brand-600)':'var(--ink-200)'};border-radius:12px;cursor:pointer;background:${state.listingId===l.id?'var(--brand-50)':'#fff'};align-items:flex-start">
+          <input type="radio" name="shop" value="${l.id}" ${state.listingId===l.id?'checked':''} style="margin-top:4px;accent-color:var(--brand-600)"/>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${sh.name} <span class="text-xs" style="color:#ca8a04">★ ${sh.avgRating?sh.avgRating.toFixed(1):'New'}</span></div>
+            <div class="text-xs muted" style="margin-top:2px">${sh.address}</div>
+            <div class="text-xs" style="margin-top:4px;color:var(--good);font-weight:600">Ready in ~${l.leadTimeHours} hrs · Delivery ₹${l.deliveryFee}</div>
+          </div>
+          <div style="text-align:right"><span class="font-display font-extrabold" style="color:var(--brand-700)">₹${Math.round(unitP)}</span><span class="text-xs muted">/${product.unit}</span></div>
+        </label>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+function renderPrintConfig(){
+  return `
+    ${product.sizes && product.sizes.length?`
+    <div class="card card-pad">
+      <label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Size</label>
+      <select id="cfg-size" class="select mt-8" style="margin-top:8px">${product.sizes.map((s,i)=>`<option value="${i}">${s}</option>`).join('')}</select>
+    </div>`:''}
+    ${product.customSize?`
+    <div class="card card-pad">
+      <label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Dimensions ${product.id==='banners'?'(feet)':'(inches)'}</label>
+      <div class="input-row" style="margin-top:8px">
+        <div><div class="text-xs muted mb-8" style="margin-bottom:4px">Width</div><input id="cfg-w" type="number" min="0.5" step="0.5" value="${state.width}" class="input"/></div>
+        <div><div class="text-xs muted mb-8" style="margin-bottom:4px">Height</div><input id="cfg-h" type="number" min="0.5" step="0.5" value="${state.height}" class="input"/></div>
+      </div>
+      <div class="hint" id="area-hint"></div>
+    </div>`:''}
+    <div class="card card-pad">
+      <label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Material / type</label>
+      <select id="cfg-mat" class="select mt-8" style="margin-top:8px">${product.materials.map((m,i)=>`<option value="${i}">${m.label}</option>`).join('')}</select>
+    </div>
+    ${product.hasSides?`
+    <div class="card card-pad">
+      <label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Printed sides</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <button data-side="single" class="side-btn btn ${state.sides==='single'?'btn-primary':'btn-outline'}">Single-sided</button>
+        <button data-side="double" class="side-btn btn ${state.sides==='double'?'btn-primary':'btn-outline'}">Double-sided (+70%)</button>
+      </div>
+    </div>`:''}
+    <div class="card card-pad">
+      <div class="flex-between"><label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Quantity</label><div class="text-xs muted" id="tier-hint"></div></div>
+      <div class="flex flex-gap" style="gap:10px;margin-top:8px;align-items:center">
+        <button id="qty-minus" class="btn btn-outline" style="width:44px;height:44px;padding:0">−</button>
+        <input id="cfg-qty" type="number" min="1" value="${state.quantity}" class="input" style="text-align:center;font-size:18px;font-weight:800;font-family:'Plus Jakarta Sans'"/>
+        <button id="qty-plus" class="btn btn-outline" style="width:44px;height:44px;padding:0">+</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        ${product.tiers.map(t=>`<button data-qty="${t[0]}" class="chip">${t[0]}${product.unit==='sq.ft'?' sq.ft':' pcs'}</button>`).join('')}
+      </div>
+    </div>`;
+}
+function renderGiftConfig(){
+  return `
+    <div class="card card-pad">
+      <label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Variant</label>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+        ${product.giftOpts.map((o,i)=>`
+          <label class="flex flex-gap" style="gap:10px;padding:10px;border:1.5px solid ${state.giftIdx===i?'var(--brand-600)':'var(--ink-200)'};border-radius:12px;cursor:pointer;background:${state.giftIdx===i?'var(--brand-50)':'#fff'}">
+            <input type="radio" name="gopt" value="${i}" ${state.giftIdx===i?'checked':''} style="accent-color:var(--brand-600)"/>
+            <div style="flex:1;font-weight:600;font-size:14px">${o.name}</div>
+            <div class="font-bold" style="color:var(--brand-700)">${inr(o.price)}</div>
+          </label>`).join('')}
+      </div>
+    </div>
+    <div class="card card-pad">
+      <label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Quantity</label>
+      <div class="flex flex-gap" style="gap:10px;margin-top:8px;align-items:center">
+        <button id="qty-minus" class="btn btn-outline" style="width:44px;height:44px;padding:0">−</button>
+        <input id="cfg-qty" type="number" min="1" value="${state.quantity}" class="input" style="text-align:center;font-size:18px;font-weight:800;font-family:'Plus Jakarta Sans'"/>
+        <button id="qty-plus" class="btn btn-outline" style="width:44px;height:44px;padding:0">+</button>
+      </div>
+    </div>
+    <div class="card card-pad">
+      <label class="text-xs font-bold uppercase muted" style="letter-spacing:.06em">Personalisation photo</label>
+      <div id="photo-upload" class="upload mt-8 ${state.photoUploaded?'done':''}" style="margin-top:8px">
+        <div class="ic">${state.photoUploaded?'✅':'🖼️'}</div>
+        <div style="font-weight:700" id="photo-label">${state.photoUploaded?'Photo attached (mock)':'Tap to upload photo'}</div>
+        <div class="text-xs muted">We'll send this to the shop when you place the order.</div>
+      </div>
+    </div>`;
+}
+
+function updatePrice(){
+  const list = listing();
+  if(!list) return;
+  const price = calcPrice(product,list,state);
+  // If not already filled, don't crash
+  const total = document.querySelector('.pd-sticky .font-display'); if(total) total.textContent = inr(price.total);
+  const qtyL = document.querySelector('.pd-sticky .text-xs'); if(qtyL) qtyL.textContent = `${price.quantity} ${product.unit}${price.quantity>1&&product.unit!=='sq.ft'?'s':''}${product.id==='banners'?` (${state.width}×${state.height} ft)`:''}`;
+  const unitL = document.querySelectorAll('.pd-sticky .text-xs')[1]; if(unitL) unitL.textContent = inr(price.unitPrice)+' per '+product.unit;
+
+  if(product.id==='banners'){
+    const area = (parseFloat(state.width)||0)*(parseFloat(state.height)||0);
+    const hint = document.getElementById('area-hint'); if(hint) hint.textContent=`Total area: ${area.toFixed(1)} sq.ft · Price per sq.ft as per bulk tier.`;
+  }
+  if(product.category==='print'){
+    const hint = document.getElementById('tier-hint'); if(hint){
+      const next = product.tiers.find(t=>t[0]>state.quantity);
+      hint.textContent = next?`Add ${next[0]-state.quantity} more → ₹${next[1]}/${product.unit}` : 'Best tier 🎉';
+    }
+    document.querySelectorAll('.tiers .tier').forEach((el,i)=>{
+      el.classList.toggle('active', tierActiveIdx()===i);
+    });
+  }
+}
+function tierActiveIdx(){
+  let idx=0;
+  for(let i=0;i<product.tiers.length;i++) if(state.quantity>=product.tiers[i][0]) idx=i;
+  return idx;
+}
+
+function readInputs(){
+  const mat=document.getElementById('cfg-mat'); if(mat) state.materialIdx=parseInt(mat.value);
+  const sz=document.getElementById('cfg-size'); if(sz) state.sizeIdx=parseInt(sz.value);
+  const qty=document.getElementById('cfg-qty'); if(qty) state.quantity=Math.max(1,parseInt(qty.value)||1);
+  const w=document.getElementById('cfg-w'); if(w) state.width=parseFloat(w.value)||1;
+  const h=document.getElementById('cfg-h'); if(h) state.height=parseFloat(h.value)||1;
+}
+
+function bind(){
+  document.querySelectorAll('input[name="shop"]').forEach(r=>r.addEventListener('change',()=>{ state.listingId=r.value; render(); }));
+  document.querySelectorAll('input[name="gopt"]').forEach(r=>r.addEventListener('change',()=>{ state.giftIdx=parseInt(r.value); updatePrice();
+    document.querySelectorAll('label:has(input[name="gopt"])').forEach(l=>l.style.borderColor='var(--ink-200)');
+    r.parentElement.style.borderColor='var(--brand-600)';
+    r.parentElement.style.background='var(--brand-50)';
+  }));
+  document.querySelectorAll('.side-btn').forEach(b=>b.addEventListener('click',()=>{
+    state.sides=b.dataset.side;
+    document.querySelectorAll('.side-btn').forEach(x=>{x.classList.remove('btn-primary');x.classList.add('btn-outline')});
+    b.classList.add('btn-primary');b.classList.remove('btn-outline');
+    updatePrice();
+  }));
+  ['cfg-mat','cfg-size','cfg-w','cfg-h','cfg-qty'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.addEventListener('input',()=>{ readInputs(); updatePrice(); });
+  });
+  const qm=document.getElementById('qty-minus'); if(qm) qm.addEventListener('click',()=>{
+    const step = product.id==='banners'?1 : (product.gifting?1:25);
+    state.quantity=Math.max(1,state.quantity-step);
+    const q=document.getElementById('cfg-qty'); q.value=state.quantity; updatePrice();
+  });
+  const qp=document.getElementById('qty-plus'); if(qp) qp.addEventListener('click',()=>{
+    const step = product.id==='banners'?1 : (product.gifting?1:25);
+    state.quantity+=step;
+    const q=document.getElementById('cfg-qty'); q.value=state.quantity; updatePrice();
+  });
+  document.querySelectorAll('[data-qty]').forEach(c=>c.addEventListener('click',()=>{
+    state.quantity=parseInt(c.dataset.qty);
+    document.getElementById('cfg-qty').value=state.quantity; updatePrice();
+  }));
+  const pu=document.getElementById('photo-upload'); if(pu) pu.addEventListener('click',()=>{
+    state.photoUploaded=true; render();
+  });
+  document.getElementById('add-cart').addEventListener('click',()=>{
+    const list = listing(); if(!list){ toast('Pick a shop first','error'); return; }
+    // Gating: require login for carting
+    if(!Auth.customer()){ toast('Please sign in to add to cart','info'); setTimeout(()=>location.href='login.html?next='+encodeURIComponent(location.pathname.split('/').pop()+location.search),400); return; }
+    const price = calcPrice(product,list,state);
+    const sh = Data.shopById(list.shopId);
+    const specs = product.category==='print' ? {
+      material: product.materials[state.materialIdx].label,
+      sides: product.hasSides?state.sides:null,
+      size: product.customSize?`${state.width}×${state.height} ${product.id==='banners'?'ft':'in'}`:product.sizes[state.sizeIdx]
+    } : { option: product.giftOpts[state.giftIdx].name+' (₹'+product.giftOpts[state.giftIdx].price+')' };
+
+    const cart = Data.cart();
+    cart.push({
+      key: uid('c'), productId:product.id, listingId:list.id, shopId:list.shopId, shopName:sh.name,
+      specs, quantity:price.quantity, unitPrice:price.unitPrice, lineTotal:price.total,
+      photoUploaded:state.photoUploaded, addedAt:now()
+    });
+    Data.saveCart(cart);
+    toast(`${product.name} added to cart`,'success');
+    setTimeout(()=>location.href='cart.html',350);
+  });
+}
+
+render();
+</script>
+</body>
+</html>

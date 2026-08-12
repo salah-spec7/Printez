@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Admin · Assign orders</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+</head>
+<body><div class="shell"><div id="sidebar"></div><main class="main">
+  <button id="mobile-toggle" class="btn btn-outline mobile-toggle" style="margin-bottom:10px">☰ Menu</button>
+  <div id="content"></div>
+</main></div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+if(!requireAuth('admin')){ /* redirected */ } else { render(); }
+
+function optionForShop(s,p,o){
+  const listings = Data.shopListings(s.id).filter(x=>x.product.id===p.id && x.listing.active);
+  const listing = listings[0];
+  if(!listing) return null;
+  let price = null;
+  if(p.gifting){
+    const gi = Math.max(0,p.giftOpts.findIndex(g=>o.specs.option && o.specs.option.startsWith(g.name)));
+    price = calcPrice(p,listing.listing,{giftIdx:gi,quantity:o.quantity}).unitPrice;
+  } else {
+    price = calcPrice(p,listing.listing,{quantity:o.quantity,materialIdx:0}).unitPrice;
+  }
+  const rating = s.avgRating ? s.avgRating.toFixed(1)+'★' : 'New';
+  return `<option value="${s.id}|${listing.listing.id}">${s.name} · ${rating} · from ₹${Math.round(price)}</option>`;
+}
+
+function renderOrderCard(o){
+  const p = Data.productById(o.productId);
+  const eligible = Data.eligibleShops(p.id);
+  const opts = eligible.map(s=>optionForShop(s,p,o)).filter(Boolean).join('');
+  return `
+  <div class="card card-pad">
+    <div class="flex" style="gap:12px;align-items:flex-start">
+      <div style="width:60px;height:60px;border-radius:12px;overflow:hidden;background:var(--ink-50);flex-shrink:0">${productArt(p,120)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700">${p.name} × ${o.quantity}</div>
+        <div class="text-xs muted">${o.id} · ${o.customerName} · ${fmtDate(o.createdAt)}</div>
+        <div class="text-xs muted" style="margin-top:2px">${Object.values(o.specs).filter(Boolean).join(' · ')}</div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select class="select" style="flex:1;min-width:200px" data-sel="${o.id}">
+            <option value="">-- Choose shop --</option>
+            ${opts}
+          </select>
+          <button class="btn btn-primary" data-go="${o.id}" style="background:#4f46e5">Assign →</button>
+          <button class="btn btn-outline" data-auto="${o.id}">Auto-assign</button>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0"><div class="font-display font-extrabold">${inr(o.totalAmount)}</div></div>
+    </div>
+  </div>`;
+}
+
+function render(){
+  document.getElementById('sidebar').innerHTML = renderAdminSidebar('assign');
+  bindAdminShell();
+  const unassigned = Data.orders().filter(o=>!o.shopId);
+  let html = `<h1 style="font-size:24px;font-weight:800">Manual order assignment</h1>
+    <p class="muted text-sm mb-16">Route unassigned orders to eligible shops. Eligible = approved shops offering that category.</p>`;
+  if(unassigned.length===0){
+    html += `<div class="card card-pad empty"><div class="ic">🎯</div><h3>All clear</h3><p>No unassigned orders — auto-assignment caught everything.</p></div>`;
+  } else {
+    html += `<div style="display:flex;flex-direction:column;gap:12px">${unassigned.map(renderOrderCard).join('')}</div>
+      <div style="height:40px"></div>`;
+  }
+  document.getElementById('content').innerHTML = html;
+
+  document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{
+    const id=b.dataset.go;
+    const sel = document.querySelector(`[data-sel="${id}"]`);
+    if(!sel.value){ toast('Pick a shop','error'); return; }
+    const [sid,lid] = sel.value.split('|');
+    const orders = Data.orders();
+    const o = orders.find(x=>x.id===id);
+    o.shopId=sid; o.listingId=lid; o.status='assigned';
+    o.timeline.push({status:'assigned',at:now()});
+    Data.saveOrders(orders);
+    toast('Assigned to '+Data.shopById(sid).name,'success');
+    render();
+  }));
+  document.querySelectorAll('[data-auto]').forEach(b=>b.addEventListener('click',()=>{
+    const id=b.dataset.auto;
+    const orders=Data.orders();
+    const o=orders.find(x=>x.id===id);
+    const c = Data.autoAssignOrder(o);
+    if(c){
+      o.status='assigned';
+      o.listingId = o.listingId || c.listing.listing.id;
+      o.timeline.push({status:'assigned',at:now()});
+      Data.saveOrders(orders);
+      toast('Auto-assigned to '+c.shop.name,'success');
+    } else { toast('No eligible shops','error'); }
+    render();
+  }));
+}
+</script>
+</body>
+</html>

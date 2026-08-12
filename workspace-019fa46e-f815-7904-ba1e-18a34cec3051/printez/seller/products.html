@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Seller · Products</title>
+<link rel="stylesheet" href="../assets/css/app.css"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+</head>
+<body>
+<div class="shell">
+  <div id="sidebar"></div>
+  <main class="main">
+    <button id="mobile-toggle" class="btn btn-outline mobile-toggle" style="margin-bottom:10px">☰ Menu</button>
+    <div id="content"></div>
+  </main>
+</div>
+<script src="../assets/js/app.js"></script>
+<script>
+pageLoaded();
+if(!requireAuth('seller')){/* */} else render();
+
+function render(){
+  document.getElementById('sidebar').innerHTML = renderSellerSidebar('products');
+  bindSellerShell();
+  const shop = Data.shopById(Auth.seller().shopId);
+  const myListings = Data.shopListings(shop.id);
+  const notOffered = Data.products().filter(p=> !myListings.find(x=>x.product.id===p.id));
+
+  document.getElementById('content').innerHTML = `
+    <div class="flex-between" style="margin-bottom:8px">
+      <h1 style="font-size:24px;font-weight:800">Your catalog</h1>
+      <a href="add-product.html" class="btn btn-primary" style="background:#059669">+ Add new product</a>
+    </div>
+    <p class="muted text-sm mb-16">Toggle products on/off as your capacity allows. Shoppers only see products marked live.</p>
+
+    <h2 class="section-title">Live on printez<span class="sub">${myListings.filter(x=>x.listing.active).length} active</span></h2>
+    ${myListings.length===0?`<div class="card card-pad empty"><div class="ic">🛍️</div><h3>No products yet</h3><p>Pick from the catalog below or add a custom product.</p></div>`:
+    `<div style="display:flex;flex-direction:column;gap:10px">${myListings.map(x=>{
+      const p=x.product, l=x.listing;
+      const price = computeStartingPrice(p,l);
+      return `<div class="card card-pad flex flex-gap" style="gap:12px;align-items:center">
+        <div style="width:60px;height:60px;border-radius:12px;overflow:hidden;background:var(--ink-50);flex-shrink:0">${productArt(p,120)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700">${p.name}</div>
+          <div class="text-xs muted">${p.tagline} · ${p.category}</div>
+          <div class="text-sm" style="margin-top:4px"><b>${inr(price)}</b><span class="muted"> starting · ${l.leadTimeHours}h lead time · delivery ₹${l.deliveryFee}</span></div>
+        </div>
+        <div class="switch ${l.active?'on':''}" data-toggle="${p.id}_${l.id}"></div>
+      </div>`;
+    }).join('')}</div>`}
+
+    ${notOffered.length?`<h2 class="section-title">Available in the printez catalog<span class="sub">Tap to start selling</span></h2>
+    <div class="grid-products">${notOffered.map(p=>`
+      <div class="pcard" style="cursor:default">
+        <div class="pcard-img">${productArt(p,240)}</div>
+        <div class="pcard-body">
+          <div class="pcard-name">${p.name}</div>
+          <div class="pcard-sub">${p.tagline}</div>
+          <button class="btn btn-primary btn-block btn-sm add-existing" style="margin-top:8px;background:#059669" data-pid="${p.id}">+ Add to my shop</button>
+        </div>
+      </div>`).join('')}</div>`:''}
+    <div style="height:40px"></div>`;
+
+  document.querySelectorAll('[data-toggle]').forEach(sw=>{
+    sw.addEventListener('click',()=>{
+      const [pid,lid] = sw.dataset.toggle.split('_');
+      const prods = Data.products();
+      const p = prods.find(x=>x.id===pid);
+      p._listingMap[lid].active = !p._listingMap[lid].active;
+      Data.saveProducts(prods);
+      toast(p._listingMap[lid].active?'Marked live':'Taken offline','success');
+      render();
+    });
+  });
+  document.querySelectorAll('.add-existing').forEach(b=>b.addEventListener('click',()=>{
+    const pid=b.dataset.pid;
+    const p = Data.productById(pid);
+    const shops = Data.shops();
+    const shop = shops.find(s=>s.id===Auth.seller().shopId);
+    const lid = uid('lst');
+    const listing = { id:lid, shopId:shop.id, productId:pid, active:true, leadTimeHours:p.category==='print'?6:24, deliveryFee:39, tierOverrides:null, baseAdj:0 };
+    shop.listings.push(lid);
+    p._listingMap = p._listingMap||{}; p._listingMap[lid]=listing;
+    p.listings = p.listings||[]; p.listings.push(lid);
+    if(!shop.categories.includes(p.category)) shop.categories.push(p.category);
+    Data.saveShops(shops);
+    Data.saveProducts(Data.products());
+    toast(p.name+' added','success');
+    render();
+  }));
+}
+</script>
+</body>
+</html>
